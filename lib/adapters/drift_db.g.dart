@@ -613,12 +613,468 @@ class MetaRowsCompanion extends UpdateCompanion<MetaRow> {
   }
 }
 
+class $OutboxRowsTable extends OutboxRows
+    with TableInfo<$OutboxRowsTable, OutboxRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $OutboxRowsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _msgIdMeta = const VerificationMeta('msgId');
+  @override
+  late final GeneratedColumn<String> msgId = GeneratedColumn<String>(
+    'msg_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _frameJsonMeta = const VerificationMeta(
+    'frameJson',
+  );
+  @override
+  late final GeneratedColumn<String> frameJson = GeneratedColumn<String>(
+    'frame_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _expiresAtMeta = const VerificationMeta(
+    'expiresAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> expiresAt = GeneratedColumn<DateTime>(
+    'expires_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [msgId, frameJson, expiresAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'outbox_rows';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<OutboxRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('msg_id')) {
+      context.handle(
+        _msgIdMeta,
+        msgId.isAcceptableOrUnknown(data['msg_id']!, _msgIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_msgIdMeta);
+    }
+    if (data.containsKey('frame_json')) {
+      context.handle(
+        _frameJsonMeta,
+        frameJson.isAcceptableOrUnknown(data['frame_json']!, _frameJsonMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_frameJsonMeta);
+    }
+    if (data.containsKey('expires_at')) {
+      context.handle(
+        _expiresAtMeta,
+        expiresAt.isAcceptableOrUnknown(data['expires_at']!, _expiresAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_expiresAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {msgId};
+  @override
+  OutboxRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return OutboxRow(
+      msgId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}msg_id'],
+      )!,
+      frameJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}frame_json'],
+      )!,
+      expiresAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}expires_at'],
+      )!,
+    );
+  }
+
+  @override
+  $OutboxRowsTable createAlias(String alias) {
+    return $OutboxRowsTable(attachedDatabase, alias);
+  }
+}
+
+class OutboxRow extends DataClass implements Insertable<OutboxRow> {
+  final String msgId;
+  final String frameJson;
+  final DateTime expiresAt;
+  const OutboxRow({
+    required this.msgId,
+    required this.frameJson,
+    required this.expiresAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['msg_id'] = Variable<String>(msgId);
+    map['frame_json'] = Variable<String>(frameJson);
+    map['expires_at'] = Variable<DateTime>(expiresAt);
+    return map;
+  }
+
+  OutboxRowsCompanion toCompanion(bool nullToAbsent) {
+    return OutboxRowsCompanion(
+      msgId: Value(msgId),
+      frameJson: Value(frameJson),
+      expiresAt: Value(expiresAt),
+    );
+  }
+
+  factory OutboxRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return OutboxRow(
+      msgId: serializer.fromJson<String>(json['msgId']),
+      frameJson: serializer.fromJson<String>(json['frameJson']),
+      expiresAt: serializer.fromJson<DateTime>(json['expiresAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'msgId': serializer.toJson<String>(msgId),
+      'frameJson': serializer.toJson<String>(frameJson),
+      'expiresAt': serializer.toJson<DateTime>(expiresAt),
+    };
+  }
+
+  OutboxRow copyWith({String? msgId, String? frameJson, DateTime? expiresAt}) =>
+      OutboxRow(
+        msgId: msgId ?? this.msgId,
+        frameJson: frameJson ?? this.frameJson,
+        expiresAt: expiresAt ?? this.expiresAt,
+      );
+  OutboxRow copyWithCompanion(OutboxRowsCompanion data) {
+    return OutboxRow(
+      msgId: data.msgId.present ? data.msgId.value : this.msgId,
+      frameJson: data.frameJson.present ? data.frameJson.value : this.frameJson,
+      expiresAt: data.expiresAt.present ? data.expiresAt.value : this.expiresAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('OutboxRow(')
+          ..write('msgId: $msgId, ')
+          ..write('frameJson: $frameJson, ')
+          ..write('expiresAt: $expiresAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(msgId, frameJson, expiresAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is OutboxRow &&
+          other.msgId == this.msgId &&
+          other.frameJson == this.frameJson &&
+          other.expiresAt == this.expiresAt);
+}
+
+class OutboxRowsCompanion extends UpdateCompanion<OutboxRow> {
+  final Value<String> msgId;
+  final Value<String> frameJson;
+  final Value<DateTime> expiresAt;
+  final Value<int> rowid;
+  const OutboxRowsCompanion({
+    this.msgId = const Value.absent(),
+    this.frameJson = const Value.absent(),
+    this.expiresAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  OutboxRowsCompanion.insert({
+    required String msgId,
+    required String frameJson,
+    required DateTime expiresAt,
+    this.rowid = const Value.absent(),
+  }) : msgId = Value(msgId),
+       frameJson = Value(frameJson),
+       expiresAt = Value(expiresAt);
+  static Insertable<OutboxRow> custom({
+    Expression<String>? msgId,
+    Expression<String>? frameJson,
+    Expression<DateTime>? expiresAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (msgId != null) 'msg_id': msgId,
+      if (frameJson != null) 'frame_json': frameJson,
+      if (expiresAt != null) 'expires_at': expiresAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  OutboxRowsCompanion copyWith({
+    Value<String>? msgId,
+    Value<String>? frameJson,
+    Value<DateTime>? expiresAt,
+    Value<int>? rowid,
+  }) {
+    return OutboxRowsCompanion(
+      msgId: msgId ?? this.msgId,
+      frameJson: frameJson ?? this.frameJson,
+      expiresAt: expiresAt ?? this.expiresAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (msgId.present) {
+      map['msg_id'] = Variable<String>(msgId.value);
+    }
+    if (frameJson.present) {
+      map['frame_json'] = Variable<String>(frameJson.value);
+    }
+    if (expiresAt.present) {
+      map['expires_at'] = Variable<DateTime>(expiresAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('OutboxRowsCompanion(')
+          ..write('msgId: $msgId, ')
+          ..write('frameJson: $frameJson, ')
+          ..write('expiresAt: $expiresAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $SeenRowsTable extends SeenRows with TableInfo<$SeenRowsTable, SeenRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $SeenRowsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _seqMeta = const VerificationMeta('seq');
+  @override
+  late final GeneratedColumn<int> seq = GeneratedColumn<int>(
+    'seq',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _msgIdMeta = const VerificationMeta('msgId');
+  @override
+  late final GeneratedColumn<String> msgId = GeneratedColumn<String>(
+    'msg_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways('UNIQUE'),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [seq, msgId];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'seen_rows';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<SeenRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('seq')) {
+      context.handle(
+        _seqMeta,
+        seq.isAcceptableOrUnknown(data['seq']!, _seqMeta),
+      );
+    }
+    if (data.containsKey('msg_id')) {
+      context.handle(
+        _msgIdMeta,
+        msgId.isAcceptableOrUnknown(data['msg_id']!, _msgIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_msgIdMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {seq};
+  @override
+  SeenRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return SeenRow(
+      seq: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}seq'],
+      )!,
+      msgId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}msg_id'],
+      )!,
+    );
+  }
+
+  @override
+  $SeenRowsTable createAlias(String alias) {
+    return $SeenRowsTable(attachedDatabase, alias);
+  }
+}
+
+class SeenRow extends DataClass implements Insertable<SeenRow> {
+  final int seq;
+  final String msgId;
+  const SeenRow({required this.seq, required this.msgId});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['seq'] = Variable<int>(seq);
+    map['msg_id'] = Variable<String>(msgId);
+    return map;
+  }
+
+  SeenRowsCompanion toCompanion(bool nullToAbsent) {
+    return SeenRowsCompanion(seq: Value(seq), msgId: Value(msgId));
+  }
+
+  factory SeenRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return SeenRow(
+      seq: serializer.fromJson<int>(json['seq']),
+      msgId: serializer.fromJson<String>(json['msgId']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'seq': serializer.toJson<int>(seq),
+      'msgId': serializer.toJson<String>(msgId),
+    };
+  }
+
+  SeenRow copyWith({int? seq, String? msgId}) =>
+      SeenRow(seq: seq ?? this.seq, msgId: msgId ?? this.msgId);
+  SeenRow copyWithCompanion(SeenRowsCompanion data) {
+    return SeenRow(
+      seq: data.seq.present ? data.seq.value : this.seq,
+      msgId: data.msgId.present ? data.msgId.value : this.msgId,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SeenRow(')
+          ..write('seq: $seq, ')
+          ..write('msgId: $msgId')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(seq, msgId);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is SeenRow && other.seq == this.seq && other.msgId == this.msgId);
+}
+
+class SeenRowsCompanion extends UpdateCompanion<SeenRow> {
+  final Value<int> seq;
+  final Value<String> msgId;
+  const SeenRowsCompanion({
+    this.seq = const Value.absent(),
+    this.msgId = const Value.absent(),
+  });
+  SeenRowsCompanion.insert({
+    this.seq = const Value.absent(),
+    required String msgId,
+  }) : msgId = Value(msgId);
+  static Insertable<SeenRow> custom({
+    Expression<int>? seq,
+    Expression<String>? msgId,
+  }) {
+    return RawValuesInsertable({
+      if (seq != null) 'seq': seq,
+      if (msgId != null) 'msg_id': msgId,
+    });
+  }
+
+  SeenRowsCompanion copyWith({Value<int>? seq, Value<String>? msgId}) {
+    return SeenRowsCompanion(seq: seq ?? this.seq, msgId: msgId ?? this.msgId);
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (seq.present) {
+      map['seq'] = Variable<int>(seq.value);
+    }
+    if (msgId.present) {
+      map['msg_id'] = Variable<String>(msgId.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SeenRowsCompanion(')
+          ..write('seq: $seq, ')
+          ..write('msgId: $msgId')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $LedgerRowsTable ledgerRows = $LedgerRowsTable(this);
   late final $PeerRowsTable peerRows = $PeerRowsTable(this);
   late final $MetaRowsTable metaRows = $MetaRowsTable(this);
+  late final $OutboxRowsTable outboxRows = $OutboxRowsTable(this);
+  late final $SeenRowsTable seenRows = $SeenRowsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -627,6 +1083,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     ledgerRows,
     peerRows,
     metaRows,
+    outboxRows,
+    seenRows,
   ];
 }
 
@@ -1028,6 +1486,284 @@ typedef $$MetaRowsTableProcessedTableManager =
       MetaRow,
       PrefetchHooks Function()
     >;
+typedef $$OutboxRowsTableCreateCompanionBuilder =
+    OutboxRowsCompanion Function({
+      required String msgId,
+      required String frameJson,
+      required DateTime expiresAt,
+      Value<int> rowid,
+    });
+typedef $$OutboxRowsTableUpdateCompanionBuilder =
+    OutboxRowsCompanion Function({
+      Value<String> msgId,
+      Value<String> frameJson,
+      Value<DateTime> expiresAt,
+      Value<int> rowid,
+    });
+
+class $$OutboxRowsTableFilterComposer
+    extends Composer<_$AppDatabase, $OutboxRowsTable> {
+  $$OutboxRowsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get msgId => $composableBuilder(
+    column: $table.msgId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get frameJson => $composableBuilder(
+    column: $table.frameJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get expiresAt => $composableBuilder(
+    column: $table.expiresAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$OutboxRowsTableOrderingComposer
+    extends Composer<_$AppDatabase, $OutboxRowsTable> {
+  $$OutboxRowsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get msgId => $composableBuilder(
+    column: $table.msgId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get frameJson => $composableBuilder(
+    column: $table.frameJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get expiresAt => $composableBuilder(
+    column: $table.expiresAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$OutboxRowsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $OutboxRowsTable> {
+  $$OutboxRowsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get msgId =>
+      $composableBuilder(column: $table.msgId, builder: (column) => column);
+
+  GeneratedColumn<String> get frameJson =>
+      $composableBuilder(column: $table.frameJson, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get expiresAt =>
+      $composableBuilder(column: $table.expiresAt, builder: (column) => column);
+}
+
+class $$OutboxRowsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $OutboxRowsTable,
+          OutboxRow,
+          $$OutboxRowsTableFilterComposer,
+          $$OutboxRowsTableOrderingComposer,
+          $$OutboxRowsTableAnnotationComposer,
+          $$OutboxRowsTableCreateCompanionBuilder,
+          $$OutboxRowsTableUpdateCompanionBuilder,
+          (
+            OutboxRow,
+            BaseReferences<_$AppDatabase, $OutboxRowsTable, OutboxRow>,
+          ),
+          OutboxRow,
+          PrefetchHooks Function()
+        > {
+  $$OutboxRowsTableTableManager(_$AppDatabase db, $OutboxRowsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$OutboxRowsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$OutboxRowsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$OutboxRowsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> msgId = const Value.absent(),
+                Value<String> frameJson = const Value.absent(),
+                Value<DateTime> expiresAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => OutboxRowsCompanion(
+                msgId: msgId,
+                frameJson: frameJson,
+                expiresAt: expiresAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String msgId,
+                required String frameJson,
+                required DateTime expiresAt,
+                Value<int> rowid = const Value.absent(),
+              }) => OutboxRowsCompanion.insert(
+                msgId: msgId,
+                frameJson: frameJson,
+                expiresAt: expiresAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$OutboxRowsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $OutboxRowsTable,
+      OutboxRow,
+      $$OutboxRowsTableFilterComposer,
+      $$OutboxRowsTableOrderingComposer,
+      $$OutboxRowsTableAnnotationComposer,
+      $$OutboxRowsTableCreateCompanionBuilder,
+      $$OutboxRowsTableUpdateCompanionBuilder,
+      (OutboxRow, BaseReferences<_$AppDatabase, $OutboxRowsTable, OutboxRow>),
+      OutboxRow,
+      PrefetchHooks Function()
+    >;
+typedef $$SeenRowsTableCreateCompanionBuilder =
+    SeenRowsCompanion Function({Value<int> seq, required String msgId});
+typedef $$SeenRowsTableUpdateCompanionBuilder =
+    SeenRowsCompanion Function({Value<int> seq, Value<String> msgId});
+
+class $$SeenRowsTableFilterComposer
+    extends Composer<_$AppDatabase, $SeenRowsTable> {
+  $$SeenRowsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get seq => $composableBuilder(
+    column: $table.seq,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get msgId => $composableBuilder(
+    column: $table.msgId,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$SeenRowsTableOrderingComposer
+    extends Composer<_$AppDatabase, $SeenRowsTable> {
+  $$SeenRowsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get seq => $composableBuilder(
+    column: $table.seq,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get msgId => $composableBuilder(
+    column: $table.msgId,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$SeenRowsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $SeenRowsTable> {
+  $$SeenRowsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get seq =>
+      $composableBuilder(column: $table.seq, builder: (column) => column);
+
+  GeneratedColumn<String> get msgId =>
+      $composableBuilder(column: $table.msgId, builder: (column) => column);
+}
+
+class $$SeenRowsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $SeenRowsTable,
+          SeenRow,
+          $$SeenRowsTableFilterComposer,
+          $$SeenRowsTableOrderingComposer,
+          $$SeenRowsTableAnnotationComposer,
+          $$SeenRowsTableCreateCompanionBuilder,
+          $$SeenRowsTableUpdateCompanionBuilder,
+          (SeenRow, BaseReferences<_$AppDatabase, $SeenRowsTable, SeenRow>),
+          SeenRow,
+          PrefetchHooks Function()
+        > {
+  $$SeenRowsTableTableManager(_$AppDatabase db, $SeenRowsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$SeenRowsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$SeenRowsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$SeenRowsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> seq = const Value.absent(),
+                Value<String> msgId = const Value.absent(),
+              }) => SeenRowsCompanion(seq: seq, msgId: msgId),
+          createCompanionCallback:
+              ({
+                Value<int> seq = const Value.absent(),
+                required String msgId,
+              }) => SeenRowsCompanion.insert(seq: seq, msgId: msgId),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$SeenRowsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $SeenRowsTable,
+      SeenRow,
+      $$SeenRowsTableFilterComposer,
+      $$SeenRowsTableOrderingComposer,
+      $$SeenRowsTableAnnotationComposer,
+      $$SeenRowsTableCreateCompanionBuilder,
+      $$SeenRowsTableUpdateCompanionBuilder,
+      (SeenRow, BaseReferences<_$AppDatabase, $SeenRowsTable, SeenRow>),
+      SeenRow,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -1038,4 +1774,8 @@ class $AppDatabaseManager {
       $$PeerRowsTableTableManager(_db, _db.peerRows);
   $$MetaRowsTableTableManager get metaRows =>
       $$MetaRowsTableTableManager(_db, _db.metaRows);
+  $$OutboxRowsTableTableManager get outboxRows =>
+      $$OutboxRowsTableTableManager(_db, _db.outboxRows);
+  $$SeenRowsTableTableManager get seenRows =>
+      $$SeenRowsTableTableManager(_db, _db.seenRows);
 }

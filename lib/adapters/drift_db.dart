@@ -29,11 +29,38 @@ class MetaRows extends Table {
   Set<Column> get primaryKey => {k};
 }
 
-@DriftDatabase(tables: [LedgerRows, PeerRows, MetaRows])
+// Store-and-forward persistence (spec §2.2 rule 5); see OutboxStore port.
+class OutboxRows extends Table {
+  TextColumn get msgId => text()();
+  TextColumn get frameJson => text()();
+  DateTimeColumn get expiresAt => dateTime()();
+  @override
+  Set<Column> get primaryKey => {msgId};
+}
+
+// Gossip dedupe-cache persistence, capped at 1024 (delete-oldest on insert);
+// see SeenStore port. `seq` orders insertion so eviction can find the oldest.
+class SeenRows extends Table {
+  IntColumn get seq => integer().autoIncrement()();
+  TextColumn get msgId => text().unique()();
+}
+
+@DriftDatabase(tables: [LedgerRows, PeerRows, MetaRows, OutboxRows, SeenRows])
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.executor);
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+    onCreate: (m) => m.createAll(),
+    onUpgrade: (m, from, to) async {
+      if (from < 2) {
+        await m.createTable(outboxRows);
+        await m.createTable(seenRows);
+      }
+    },
+  );
 }
 
 AppDatabase openAppDatabase() => AppDatabase(driftDatabase(name: 'cmo'));
