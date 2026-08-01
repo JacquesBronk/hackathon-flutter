@@ -85,4 +85,8 @@ class InMemoryPeerDirectory implements PeerDirectory {
   Future<void> record(String addr, String name) async => _names[addr] = name;
   @override
   Future<String?> nameFor(String addr) async => _names[addr];
+  @override
+  Future<List<({String addr, String name})>> entries() async => [
+    for (final e in _names.entries) (addr: e.key, name: e.value),
+  ];
 }

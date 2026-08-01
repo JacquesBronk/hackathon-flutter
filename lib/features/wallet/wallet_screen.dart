@@ -25,6 +25,11 @@ class WalletScreen extends ConsumerWidget {
         title: Text('${profile?.avatar ?? ''} ${profile?.name ?? ''}'),
         actions: [
           IconButton(
+            key: const Key('wallet.radar'),
+            icon: const Icon(Icons.radar),
+            onPressed: () => Navigator.pushNamed(context, '/radar'),
+          ),
+          IconButton(
             icon: const Icon(Icons.qr_code),
             onPressed: () => Navigator.pushNamed(context, '/receive'),
           ),
