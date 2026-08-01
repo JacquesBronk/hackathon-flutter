@@ -37,7 +37,7 @@ class PinnieCoinState extends State<PinnieCoin>
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: _c,
-    builder: (_, __) => Transform(
+    builder: (_, _) => Transform(
       alignment: Alignment.center,
       transform: Matrix4.identity()
         ..setEntry(3, 2, 0.001)

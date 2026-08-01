@@ -13,8 +13,9 @@ void main() {
   });
 
   testWidgets('coin renders and its flip animation terminates', (tester) async {
-    await tester.pumpWidget(const MaterialApp(
-        home: Scaffold(body: PinnieCoin(flipOnBuild: true))));
+    await tester.pumpWidget(
+      const MaterialApp(home: Scaffold(body: PinnieCoin(flipOnBuild: true))),
+    );
     expect(find.byType(PinnieCoin), findsOneWidget);
     await tester.pumpAndSettle(); // hangs forever if the animation loops
   });

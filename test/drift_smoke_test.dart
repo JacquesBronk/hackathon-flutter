@@ -5,6 +5,6 @@ void main() {
   test('native sqlite3 loads headless on this worker', () {
     final db = sqlite3.openInMemory();
     expect(db.select('SELECT 1 AS x').first['x'], 1);
-    db.dispose();
+    db.close();
   });
 }
