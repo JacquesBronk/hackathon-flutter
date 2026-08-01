@@ -10,10 +10,12 @@ import 'adapters/secure_key_vault.dart';
 import 'domain/keys.dart';
 import 'fakes/fakes.dart';
 import 'fakes/mesh_fakes.dart';
+import 'fakes/nfc_fakes.dart';
 import 'ports/biometric_gate.dart';
 import 'ports/key_vault.dart';
 import 'ports/ledger_store.dart';
 import 'ports/mesh_transport.dart';
+import 'ports/nfc_port.dart';
 import 'ports/notifier.dart';
 import 'ports/outbox_store.dart';
 import 'ports/peer_directory.dart';
@@ -22,11 +24,13 @@ import 'ports/qr_scanner.dart';
 import 'ports/seen_store.dart';
 import 'state/ledger_controller.dart';
 import 'state/mesh_controller.dart';
+import 'state/nfc_controller.dart';
 import 'state/profile_controller.dart';
 
 export 'state/ledger_controller.dart' show LedgerController, LedgerState;
 export 'state/mesh_controller.dart'
     show MeshController, MeshState, MeshDeliveryStatus;
+export 'state/nfc_controller.dart' show NfcController, NfcState;
 export 'state/profile_controller.dart' show ProfileController;
 export 'ports/profile_store.dart' show Profile;
 export 'ports/mesh_transport.dart' show MeshPeer;
@@ -72,6 +76,7 @@ final outboxStoreProvider = Provider<OutboxStore>(
 final seenStoreProvider = Provider<SeenStore>(
   (_) => throw UnimplementedError(),
 );
+final nfcPortProvider = Provider<NfcPort>((_) => throw UnimplementedError());
 
 /// null until a wallet exists (pre-onboarding).
 final walletKeysProvider = FutureProvider<WalletKeys?>((ref) async {
@@ -86,6 +91,9 @@ final profileControllerProvider =
 final meshControllerProvider = AsyncNotifierProvider<MeshController, MeshState>(
   MeshController.new,
 );
+final nfcControllerProvider = AsyncNotifierProvider<NfcController, NfcState>(
+  NfcController.new,
+);
 
 /// Full fake set for tests and FAKE_HARDWARE runs. Pass specific instances
 /// when a test needs to drive them (emit scans, deny biometrics, inject
@@ -97,6 +105,7 @@ List<Override> fakeHardwareOverrides({
   FakeNotifier? notifier,
   InMemoryOutboxStore? outboxStore,
   InMemorySeenStore? seenStore,
+  FakeNfcPort? nfcPort,
 }) => [
   keyVaultProvider.overrideWithValue(InMemoryKeyVault()),
   biometricGateProvider.overrideWithValue(gate ?? FakeBiometricGate()),
@@ -108,6 +117,7 @@ List<Override> fakeHardwareOverrides({
   notifierProvider.overrideWithValue(notifier ?? FakeNotifier()),
   outboxStoreProvider.overrideWithValue(outboxStore ?? InMemoryOutboxStore()),
   seenStoreProvider.overrideWithValue(seenStore ?? InMemorySeenStore()),
+  nfcPortProvider.overrideWithValue(nfcPort ?? FakeNfcPort()),
 ];
 
 /// Full real-hardware set for on-device runs (`FAKE_HARDWARE=false`).
