@@ -116,4 +116,34 @@ void main() {
     await subB.cancel();
     await subC.cancel();
   });
+
+  test(
+    'LoopbackHub setLink(up: false) emits peerLost to both sides exactly once',
+    () async {
+      final hub = LoopbackHub();
+      final a = FakeMeshTransport();
+      final b = FakeMeshTransport();
+      hub.join('a', a);
+      hub.join('b', b);
+
+      final aLost = <String>[];
+      final bLost = <String>[];
+      final subA = a.peerLost.listen(aLost.add);
+      final subB = b.peerLost.listen(bLost.add);
+
+      hub.setLink('a', 'b', up: false);
+      await pumpEventQueue();
+      expect(aLost, ['b']);
+      expect(bLost, ['a']);
+
+      // Already down — setLink(up:false) again must not re-emit.
+      hub.setLink('a', 'b', up: false);
+      await pumpEventQueue();
+      expect(aLost, ['b']);
+      expect(bLost, ['a']);
+
+      await subA.cancel();
+      await subB.cancel();
+    },
+  );
 }

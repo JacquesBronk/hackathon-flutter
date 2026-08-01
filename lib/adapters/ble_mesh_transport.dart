@@ -98,6 +98,7 @@ class BleMeshTransport implements MeshTransport {
 
   final _peripheralManager = periph.PeripheralManager();
   final _peerEvents = StreamController<MeshPeer>.broadcast();
+  final _peerLost = StreamController<String>.broadcast();
   final _inboundFrames = StreamController<String>.broadcast();
   final _subs = <StreamSubscription<Object?>>[];
 
@@ -121,6 +122,8 @@ class BleMeshTransport implements MeshTransport {
 
   @override
   Stream<MeshPeer> get peerEvents => _peerEvents.stream;
+  @override
+  Stream<String> get peerLost => _peerLost.stream;
   @override
   Stream<String> get inboundFrames => _inboundFrames.stream;
 
@@ -368,6 +371,7 @@ class BleMeshTransport implements MeshTransport {
   void _forgetLink(String key) {
     _senders.remove(key);
     _reassemblers.remove(key);
-    _addrByKey.remove(key);
+    final addr = _addrByKey.remove(key);
+    if (addr != null) _peerLost.add(addr);
   }
 }

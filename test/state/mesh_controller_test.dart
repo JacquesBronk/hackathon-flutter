@@ -225,6 +225,53 @@ void main() {
     },
   );
 
+  test('peer-lost: link down empties livePeers; targeted send after disconnect '
+      'parks in outbox; relink flushes and delivers', () async {
+    final hub = LoopbackHub();
+    final sender = await _createNode(containers, 'Sender');
+    final receiver = await _createNode(containers, 'Receiver');
+    hub.join(sender.addr, sender.transport);
+    hub.join(receiver.addr, receiver.transport);
+    await pumpEventQueue();
+
+    final beforeState = await sender.container.read(
+      meshControllerProvider.future,
+    );
+    expect(beforeState.livePeers.map((p) => p.addr), [receiver.addr]);
+
+    hub.setLink(sender.addr, receiver.addr, up: false);
+    await pumpEventQueue();
+
+    final afterDisconnect = await sender.container.read(
+      meshControllerProvider.future,
+    );
+    expect(afterDisconnect.livePeers, isEmpty);
+
+    final txId = await sender.mesh.sendMeshTx(to: receiver.addr, amount: 33);
+    await pumpEventQueue();
+    expect(await sender.outboxStore.pending(), hasLength(1));
+    final hoppingState = await sender.container.read(
+      meshControllerProvider.future,
+    );
+    expect(hoppingState.deliveries[txId], MeshDeliveryStatus.hopping);
+
+    hub.setLink(sender.addr, receiver.addr, up: true);
+    await pumpEventQueue();
+    await pumpEventQueue();
+    await pumpEventQueue();
+
+    final receiverState = await receiver.container.read(
+      ledgerControllerProvider.future,
+    );
+    expect(receiverState.balances[receiver.addr], 533); // 500 mint + 33
+
+    final deliveredState = await sender.container.read(
+      meshControllerProvider.future,
+    );
+    expect(deliveredState.deliveries[txId], MeshDeliveryStatus.delivered);
+    expect(await sender.outboxStore.pending(), isEmpty);
+  });
+
   test(
     '4-node LoopbackHub chain sim: relay hops, exactly-once ingest, receipt hops',
     () async {

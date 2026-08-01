@@ -48,10 +48,13 @@ class FakeMeshTransport implements MeshTransport {
   String? _hubAddr;
 
   final _peerEvents = StreamController<MeshPeer>.broadcast();
+  final _peerLost = StreamController<String>.broadcast();
   final _inboundFrames = StreamController<String>.broadcast();
 
   @override
   Stream<MeshPeer> get peerEvents => _peerEvents.stream;
+  @override
+  Stream<String> get peerLost => _peerLost.stream;
   @override
   Stream<String> get inboundFrames => _inboundFrames.stream;
 
@@ -70,6 +73,9 @@ class FakeMeshTransport implements MeshTransport {
   /// Test-only: simulate a discovered/updated peer.
   void injectPeer(MeshPeer peer) => _peerEvents.add(peer);
 
+  /// Test-only: simulate a peer disconnecting.
+  void injectPeerLost(String addr) => _peerLost.add(addr);
+
   /// Test-only: simulate an inbound frame arriving off-hub.
   void injectFrame(String frameJson) => _inboundFrames.add(frameJson);
 
@@ -80,6 +86,7 @@ class FakeMeshTransport implements MeshTransport {
 
   void _deliverInbound(String frameJson) => _inboundFrames.add(frameJson);
   void _emitPeerEvent(MeshPeer peer) => _peerEvents.add(peer);
+  void _emitPeerLost(String addr) => _peerLost.add(addr);
 }
 
 /// In-memory hub joining N [FakeMeshTransport]s into a virtual radio space —
@@ -105,8 +112,7 @@ class LoopbackHub {
     if (up) {
       _linkUp(a, b);
     } else {
-      _links[a]?.remove(b);
-      _links[b]?.remove(a);
+      _linkDown(a, b);
     }
   }
 
@@ -122,10 +128,24 @@ class LoopbackHub {
     }
   }
 
+  void _linkDown(String a, String b) {
+    final wasUp = _links[a]?.contains(b) ?? false;
+    _links[a]?.remove(b);
+    _links[b]?.remove(a);
+    if (wasUp) {
+      _notifyDisconnected(a, b);
+      _notifyDisconnected(b, a);
+    }
+  }
+
   void _notifyConnected(String selfAddr, String peerAddr) {
     _transports[selfAddr]?._emitPeerEvent(
       MeshPeer(addr: peerAddr, name: null, rssi: -50, lastSeen: DateTime.now()),
     );
+  }
+
+  void _notifyDisconnected(String selfAddr, String peerAddr) {
+    _transports[selfAddr]?._emitPeerLost(peerAddr);
   }
 
   void _broadcastFrom(String fromAddr, String frameJson) {

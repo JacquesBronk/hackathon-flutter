@@ -63,6 +63,7 @@ class MeshController extends AsyncNotifier<MeshState> {
       _engine.relays.listen(_handleRelay),
       _transport.inboundFrames.listen(_engine.onFrame),
       _transport.peerEvents.listen(_handlePeerEvent),
+      _transport.peerLost.listen(_handlePeerLost),
     ];
     ref.onDispose(() {
       for (final s in subs) {
@@ -83,9 +84,7 @@ class MeshController extends AsyncNotifier<MeshState> {
           final payload = decodeQr(envelope.payload);
           if (payload is! SignedTransactionPayload) return;
           final tx = payload.transaction;
-          await ref
-              .read(ledgerControllerProvider.notifier)
-              .ingestExternal(tx);
+          await ref.read(ledgerControllerProvider.notifier).ingestExternal(tx);
           _engine.originate(
             MeshEnvelope(
               msgId: _uuid.v7(),
@@ -153,6 +152,17 @@ class MeshController extends AsyncNotifier<MeshState> {
       ),
     );
     unawaited(flushOutboxOnce());
+  }
+
+  void _handlePeerLost(String addr) {
+    _peersByAddr.remove(addr);
+    _engine.hasConnectedPeers = _peersByAddr.isNotEmpty;
+    state = AsyncData(
+      MeshState(
+        livePeers: _peersByAddr.values.toList(),
+        deliveries: state.valueOrNull?.deliveries ?? const {},
+      ),
+    );
   }
 
   void _setDelivery(String txId, MeshDeliveryStatus status) {

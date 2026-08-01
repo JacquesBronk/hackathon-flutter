@@ -17,6 +17,7 @@ abstract interface class MeshTransport {
   Future<void> stop();
   Stream<MeshPeer>
   get peerEvents; // connect/update events (rssi refreshes re-emit)
+  Stream<String> get peerLost; // addr of a peer that just disconnected
   Stream<String> get inboundFrames; // whole envelope JSON strings
   Future<void> broadcastFrame(String frameJson); // to all connected peers
 }
