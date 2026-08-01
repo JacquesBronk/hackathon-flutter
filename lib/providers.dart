@@ -1,10 +1,13 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart' hide Notifier;
 import 'adapters/ble_mesh_transport.dart';
+import 'adapters/compass_adapter.dart';
 import 'adapters/drift_db.dart';
 import 'adapters/drift_outbox_store.dart';
+import 'adapters/haptics_adapter.dart';
 import 'adapters/local_auth_gate.dart';
 import 'adapters/local_notifier.dart';
 import 'adapters/mobile_qr_scanner.dart';
+import 'adapters/motion_sensor_adapter.dart';
 import 'adapters/prefs_profile_store.dart';
 import 'adapters/secure_key_vault.dart';
 import 'domain/keys.dart';
@@ -12,6 +15,7 @@ import 'fakes/fakes.dart';
 import 'fakes/mesh_fakes.dart';
 import 'fakes/sensor_fakes.dart';
 import 'ports/biometric_gate.dart';
+import 'ports/compass_port.dart';
 import 'ports/haptics.dart';
 import 'ports/key_vault.dart';
 import 'ports/ledger_store.dart';
@@ -84,6 +88,9 @@ final motionSensorProvider = Provider<MotionSensor>(
   (_) => throw UnimplementedError(),
 );
 final hapticsProvider = Provider<Haptics>((_) => throw UnimplementedError());
+final compassProvider = Provider<CompassPort>(
+  (_) => throw UnimplementedError(),
+);
 
 /// null until a wallet exists (pre-onboarding).
 final walletKeysProvider = FutureProvider<WalletKeys?>((ref) async {
@@ -117,6 +124,7 @@ List<Override> fakeHardwareOverrides({
   InMemorySeenStore? seenStore,
   FakeMotionSensor? motionSensor,
   FakeHaptics? haptics,
+  FakeCompassPort? compass,
 }) => [
   keyVaultProvider.overrideWithValue(InMemoryKeyVault()),
   biometricGateProvider.overrideWithValue(gate ?? FakeBiometricGate()),
@@ -130,6 +138,7 @@ List<Override> fakeHardwareOverrides({
   seenStoreProvider.overrideWithValue(seenStore ?? InMemorySeenStore()),
   motionSensorProvider.overrideWithValue(motionSensor ?? FakeMotionSensor()),
   hapticsProvider.overrideWithValue(haptics ?? FakeHaptics()),
+  compassProvider.overrideWithValue(compass ?? FakeCompassPort()),
 ];
 
 /// Full real-hardware set for on-device runs (`FAKE_HARDWARE=false`).
@@ -153,5 +162,8 @@ List<Override> realHardwareOverrides() {
     notifierProvider.overrideWithValue(LocalNotifier()),
     outboxStoreProvider.overrideWithValue(DriftOutboxStore(db)),
     seenStoreProvider.overrideWithValue(DriftSeenStore(db)),
+    motionSensorProvider.overrideWithValue(MotionSensorAdapter()),
+    hapticsProvider.overrideWithValue(HapticsAdapter()),
+    compassProvider.overrideWithValue(CompassAdapter()),
   ];
 }
