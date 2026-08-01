@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:cash_me_outside/domain/keys.dart';
 import 'package:cash_me_outside/domain/mesh/gossip_engine.dart';
@@ -22,6 +23,7 @@ class _RecordingObserver extends NavigatorObserver {
 Future<(ProviderContainer, FakeMeshTransport)> _pumpRadar(
   WidgetTester tester, {
   Stream<RelayEvent>? relayEvents,
+  Stream<double>? headings,
   NavigatorObserver? observer,
 }) async {
   final transport = FakeMeshTransport();
@@ -47,7 +49,7 @@ Future<(ProviderContainer, FakeMeshTransport)> _pumpRadar(
               : const SizedBox(),
           settings: settings,
         ),
-        home: RadarScreen(relayEvents: relayEvents),
+        home: RadarScreen(relayEvents: relayEvents, headings: headings),
       ),
     ),
   );
@@ -206,4 +208,36 @@ void main() {
 
     expect(find.byKey(Key('radar.blip.${peer.address}')), findsOneWidget);
   });
+
+  testWidgets(
+    'compass heading rotates blip position (B5 bearing merge); absent '
+    'heading data leaves the RSSI-ring-only layout unchanged',
+    (tester) async {
+      final headings = StreamController<double>.broadcast();
+      addTearDown(headings.close);
+      final (_, transport) = await _pumpRadar(
+        tester,
+        headings: headings.stream,
+      );
+      final peer = await WalletKeys.fromSeed(List.filled(32, 7));
+      transport.injectPeer(_peer(peer.address, -40));
+      await tester.pump();
+      await tester.pump();
+
+      // No heading reading has arrived yet — same fallback layout as every
+      // other test in this file (which never passes `headings` at all).
+      final beforeHeading = tester.getCenter(
+        find.byKey(Key('radar.blip.${peer.address}')),
+      );
+
+      headings.add(math.pi / 2);
+      await tester.pump();
+      await tester.pump();
+
+      final afterHeading = tester.getCenter(
+        find.byKey(Key('radar.blip.${peer.address}')),
+      );
+      expect(afterHeading, isNot(equals(beforeHeading)));
+    },
+  );
 }
