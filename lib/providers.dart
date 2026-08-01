@@ -1,6 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart' hide Notifier;
+import 'adapters/ble_mesh_transport.dart';
 import 'adapters/drift_db.dart';
+import 'adapters/drift_outbox_store.dart';
 import 'adapters/local_auth_gate.dart';
+import 'adapters/local_notifier.dart';
 import 'adapters/mobile_qr_scanner.dart';
 import 'adapters/prefs_profile_store.dart';
 import 'adapters/secure_key_vault.dart';
@@ -117,5 +120,16 @@ List<Override> realHardwareOverrides() {
     ledgerStoreProvider.overrideWithValue(DriftLedgerStore(db)),
     profileStoreProvider.overrideWithValue(PrefsProfileStore()),
     peerDirectoryProvider.overrideWithValue(DriftPeerDirectory(db)),
+    // Lazily constructed on first read (inside MeshController.build(), which
+    // only runs once a wallet exists — see app.dart's real-wiring bootstrap)
+    // since BleMeshTransport needs the resolved wallet address/name up front.
+    meshTransportProvider.overrideWith((ref) {
+      final selfAddr = ref.read(walletKeysProvider).value!.address;
+      final selfName = ref.read(profileControllerProvider).value?.name ?? '';
+      return BleMeshTransport(selfAddr: selfAddr, selfName: selfName);
+    }),
+    notifierProvider.overrideWithValue(LocalNotifier()),
+    outboxStoreProvider.overrideWithValue(DriftOutboxStore(db)),
+    seenStoreProvider.overrideWithValue(DriftSeenStore(db)),
   ];
 }

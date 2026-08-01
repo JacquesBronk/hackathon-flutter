@@ -7,6 +7,7 @@ void main() {
   runApp(
     CashMeOutsideApp(
       overrides: useFakes ? fakeHardwareOverrides() : realHardwareOverrides(),
+      enableMeshRealWiring: !useFakes,
     ),
   );
 }

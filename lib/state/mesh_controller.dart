@@ -30,6 +30,11 @@ class MeshController extends AsyncNotifier<MeshState> {
   late final Notifier _notifier;
   late final String _selfAddr;
 
+  /// Relay traffic this node forwards for others — only meaningful once
+  /// [build] has completed (e.g. after `await future`); the radar screen's
+  /// pulse animation is fed from this.
+  Stream<RelayEvent> get relays => _engine.relays;
+
   final _peersByAddr = <String, MeshPeer>{};
   // envelope msgId of an originated `tx` -> that transaction's id, so a
   // later receipt (keyed by the envelope msgId) can update `deliveries`
