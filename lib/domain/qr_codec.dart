@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'keys.dart';
 import 'transaction.dart';
 
@@ -16,6 +17,16 @@ class SignedTransactionPayload extends QrPayload {
   final Transaction transaction;
 }
 
+/// Voucher sticker payload ("stick ᵽ50 under a chair") — spec §4. `tx` pays a
+/// throwaway address; `seed` reconstructs that throwaway's keys for the
+/// sweep. Double-claim is a sanctioned feature, not a bug: this codec never
+/// enforces exclusivity.
+class VoucherPayload extends QrPayload {
+  VoucherPayload({required this.tx, required this.seed});
+  final Transaction tx;
+  final Uint8List seed;
+}
+
 class QrDecodeException implements Exception {
   QrDecodeException(this.message);
   final String message;
@@ -31,6 +42,11 @@ String encodeReceiveRequest(ReceiveRequest rr) => _wrap('rr1', {
 });
 
 String encodeTransaction(Transaction tx) => _wrap('tx1', tx.toJson());
+
+String encodeVoucher(VoucherPayload voucher) => _wrap('v1', {
+  'tx': encodeTransaction(voucher.tx),
+  'seed': b64u(voucher.seed),
+});
 
 QrPayload decodeQr(String raw) {
   final parts = raw.split(':');
@@ -59,6 +75,25 @@ QrPayload decodeQr(String raw) {
       } on FormatException {
         throw QrDecodeException('not a pinnie code');
       }
+    case 'v1':
+      final tx = json['tx'], seed = json['seed'];
+      if (tx is! String || seed is! String) {
+        throw QrDecodeException('not a pinnie code');
+      }
+      final Uint8List seedBytes;
+      try {
+        seedBytes = b64uDecode(seed);
+      } catch (_) {
+        throw QrDecodeException('not a pinnie code');
+      }
+      if (seedBytes.length != 32) {
+        throw QrDecodeException('not a pinnie code');
+      }
+      final inner = decodeQr(tx);
+      if (inner is! SignedTransactionPayload) {
+        throw QrDecodeException('not a pinnie code');
+      }
+      return VoucherPayload(tx: inner.transaction, seed: seedBytes);
     default:
       throw QrDecodeException('not a pinnie code');
   }

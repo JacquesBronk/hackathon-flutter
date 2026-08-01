@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:cash_me_outside/domain/keys.dart';
 import 'package:cash_me_outside/domain/ledger.dart';
 import 'package:cash_me_outside/domain/qr_codec.dart';
@@ -39,6 +41,60 @@ void main() {
       'hello', 'cmo:', 'cmo:zz1:aaaa', 'cmo:rr2:aaaa', 'cmo:rr1:%%%',
       'cmo:tx1:aGVsbG8', // valid b64u, not json
       'cmo:rr1:e30', // {} — missing fields
+    ]) {
+      expect(
+        () => decodeQr(bad),
+        throwsA(isA<QrDecodeException>()),
+        reason: bad,
+      );
+    }
+  });
+
+  test('voucher round trips byte-identically', () async {
+    final owner = await WalletKeys.fromSeed(List.filled(32, 4));
+    final throwaway = await WalletKeys.fromSeed(List.filled(32, 5));
+    final seed = await throwaway.seed();
+    final tx = await buildSigned(
+      keys: owner,
+      to: throwaway.address,
+      amount: 50,
+      type: txTypeTransfer,
+      lamportTs: 2,
+    );
+    final uri = encodeVoucher(VoucherPayload(tx: tx, seed: seed));
+    expect(uri, startsWith('cmo:v1:'));
+    final decoded = decodeQr(uri) as VoucherPayload;
+    expect(decoded.tx.toJson(), tx.toJson());
+    expect(decoded.seed, seed);
+  });
+
+  test('malformed vouchers throw QrDecodeException', () async {
+    final owner = await WalletKeys.fromSeed(List.filled(32, 4));
+    final throwaway = await WalletKeys.fromSeed(List.filled(32, 5));
+    final seed = await throwaway.seed();
+    final tx = await buildSigned(
+      keys: owner,
+      to: throwaway.address,
+      amount: 50,
+      type: txTypeTransfer,
+      lamportTs: 2,
+    );
+    final validTxUri = encodeTransaction(tx);
+    final rr = ReceiveRequest(addr: 'someaddr', name: 'Thabo');
+
+    String wrap(Map<String, Object?> json) =>
+        'cmo:v1:${b64u(utf8.encode(jsonEncode(json)))}';
+
+    for (final bad in [
+      'cmo:v1:%%%', // invalid b64u envelope
+      wrap({'seed': b64u(seed)}), // missing tx
+      wrap({'tx': validTxUri}), // missing seed
+      wrap({'tx': 123, 'seed': b64u(seed)}), // tx not a string
+      wrap({'tx': validTxUri, 'seed': 123}), // seed not a string
+      wrap({'tx': validTxUri, 'seed': '%%%'}), // seed not valid b64u
+      wrap({'tx': validTxUri, 'seed': b64u(List.filled(16, 1))}), // short seed
+      wrap({'tx': 'not a cmo uri at all', 'seed': b64u(seed)}),
+      wrap({'tx': encodeReceiveRequest(rr), 'seed': b64u(seed)}), // wrong kind
     ]) {
       expect(
         () => decodeQr(bad),

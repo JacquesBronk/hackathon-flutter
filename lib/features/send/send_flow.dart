@@ -66,6 +66,8 @@ class _SendFlowState extends ConsumerState<SendFlow> {
         });
       case SignedTransactionPayload _:
         _showSnack("That's a payment code — use Receive");
+      case VoucherPayload _:
+        _showSnack("That's a voucher — use NFC to claim it");
     }
   }
 

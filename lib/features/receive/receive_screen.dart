@@ -74,6 +74,8 @@ class _ReceiveScreenState extends ConsumerState<ReceiveScreen> {
         }
       case ReceiveRequest _:
         _showSnack("That's a request code — use Send");
+      case VoucherPayload _:
+        _showSnack("That's a voucher — use NFC to claim it");
     }
   }
 
