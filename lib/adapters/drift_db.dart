@@ -120,4 +120,10 @@ class DriftPeerDirectory implements PeerDirectory {
   Future<String?> nameFor(String addr) async => (await (_db.select(
     _db.peerRows,
   )..where((t) => t.addr.equals(addr))).getSingleOrNull())?.name;
+
+  @override
+  Future<List<({String addr, String name})>> entries() async => [
+    for (final row in await _db.select(_db.peerRows).get())
+      (addr: row.addr, name: row.name),
+  ];
 }

@@ -98,22 +98,17 @@ void main() {
       await tester.tap(find.byKey(const Key('onboard.biometric')));
       await tester.pumpAndSettle();
 
-      final senderAddr =
-          (await senderContainer.read(walletKeysProvider.future))!.address;
+      final senderAddr = (await senderContainer.read(
+        walletKeysProvider.future,
+      ))!.address;
       await senderContainer.read(meshControllerProvider.future);
 
-      // Star topology: sender is directly linked to both Receiver and
-      // Bystander; Receiver and Bystander are NOT linked to each other.
-      // A tx targeted at Receiver still reaches Bystander too (sender
-      // broadcasts to all its links) — Bystander relays it for a
-      // "stranger" (exercising the relay-notification path) while Receiver
-      // (the actual target) delivers it directly, hop count 0.
-      hub.join(senderAddr, senderTransport);
-      hub.join(receiver.addr, receiver.transport);
-      hub.join(bystander.addr, bystander.transport);
-      hub.setLink(receiver.addr, bystander.addr, up: false);
-      await _flushMesh(tester);
-
+      // NOBODY is on the hub yet. The send must park in the sender's outbox
+      // so 'Hopping' is a STABLE state we can assert — with a live link the
+      // delivery + receipt complete inside pumpAndSettle and the transient
+      // assertion races (the exact A7 blocker this replaces). Peers join
+      // AFTER the assert; peer-connect then flushes the outbox
+      // (store-and-forward, spec §2.2 rule 5).
       await senderContainer
           .read(peerDirectoryProvider)
           .record(receiver.addr, 'Rex');
@@ -125,22 +120,27 @@ void main() {
       await tester.tap(find.byKey(const Key('send.method.mesh')));
       await tester.pumpAndSettle();
 
-      // Peer picker shows both live peers; pick Receiver specifically.
-      expect(
-        find.text('Rex · ${truncateAddr(receiver.addr)}'),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(Key('mesh.peer.${bystander.addr}')),
-        findsOneWidget,
-      );
+      // Peer picker shows the directory-known (offline) peer.
+      expect(find.text('Rex · ${truncateAddr(receiver.addr)}'), findsOneWidget);
       await tester.tap(find.byKey(Key('mesh.peer.${receiver.addr}')));
       await tester.pumpAndSettle();
 
       await tester.enterText(find.byKey(const Key('mesh.send.amount')), '42');
       await tester.tap(find.byKey(const Key('mesh.send.confirm')));
       await tester.pumpAndSettle();
+      // Deterministic: no peers connected -> envelope outboxed -> Hopping.
       expect(find.textContaining('Hopping'), findsOneWidget);
+
+      // Star topology comes up now: sender directly linked to Receiver and
+      // Bystander; Receiver and Bystander NOT linked to each other. The
+      // peer-connect event flushes the outbox; the retransmitted broadcast
+      // reaches both — Receiver (the target) delivers with hop count 0,
+      // Bystander overhears and relays for a "stranger" (the
+      // relay-notification path).
+      hub.join(senderAddr, senderTransport);
+      hub.join(receiver.addr, receiver.transport);
+      hub.join(bystander.addr, bystander.transport);
+      hub.setLink(receiver.addr, bystander.addr, up: false);
 
       await _flushMesh(tester);
       await tester.pumpAndSettle();

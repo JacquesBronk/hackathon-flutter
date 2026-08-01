@@ -103,38 +103,62 @@ class _MeshSendFlowState extends ConsumerState<MeshSendFlow> {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (_, _) =>
             const Center(child: Text("Couldn't load nearby phones")),
-        data: (mesh) {
-          final peers = mesh.livePeers;
-          if (peers.isEmpty) {
-            return const Center(
-              child: Padding(
-                padding: EdgeInsets.all(24),
-                child: Text(
-                  'No phones nearby yet — move closer to a friend!',
-                  textAlign: TextAlign.center,
+        // Spec §2.4: the picker is the UNION of live mesh peers (badged
+        // 'live') and every PeerDirectory entry ever seen — offline peers
+        // are pickable; delivery then rides the store-and-forward outbox.
+        data: (mesh) => FutureBuilder<List<({String addr, String name})>>(
+          future: ref.read(peerDirectoryProvider).entries(),
+          builder: (context, snapshot) {
+            final live = mesh.livePeers;
+            final liveAddrs = {for (final p in live) p.addr};
+            final known = (snapshot.data ?? const [])
+                .where((e) => !liveAddrs.contains(e.addr))
+                .toList();
+            if (live.isEmpty && known.isEmpty) {
+              return const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Text(
+                    'No phones nearby yet — move closer to a friend!',
+                    textAlign: TextAlign.center,
+                  ),
                 ),
-              ),
-            );
-          }
-          return ListView.builder(
-            itemCount: peers.length,
-            itemBuilder: (context, index) {
-              final peer = peers[index];
-              return FutureBuilder<String?>(
-                future: ref.read(peerDirectoryProvider).nameFor(peer.addr),
-                builder: (context, snapshot) {
-                  final name = snapshot.data ?? peer.name;
-                  return ListTile(
-                    key: Key('mesh.peer.${peer.addr}'),
-                    title: Text(_displayName(peer.addr, name)),
-                    trailing: const Chip(label: Text('live')),
-                    onTap: () => _pickPeer(peer, name),
-                  );
-                },
               );
-            },
-          );
-        },
+            }
+            return ListView(
+              children: [
+                for (final peer in live)
+                  FutureBuilder<String?>(
+                    future: ref.read(peerDirectoryProvider).nameFor(peer.addr),
+                    builder: (context, snap) {
+                      final name = snap.data ?? peer.name;
+                      return ListTile(
+                        key: Key('mesh.peer.${peer.addr}'),
+                        title: Text(_displayName(peer.addr, name)),
+                        trailing: const Chip(label: Text('live')),
+                        onTap: () => _pickPeer(peer, name),
+                      );
+                    },
+                  ),
+                for (final e in known)
+                  ListTile(
+                    key: Key('mesh.peer.${e.addr}'),
+                    title: Text(_displayName(e.addr, e.name)),
+                    trailing: const Chip(label: Text('known')),
+                    onTap: () => _pickPeer(
+                      MeshPeer(
+                        addr: e.addr,
+                        name: e.name,
+                        rssi: -127,
+                        lastSeen: DateTime.fromMillisecondsSinceEpoch(0),
+                      ),
+                      e.name,
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }

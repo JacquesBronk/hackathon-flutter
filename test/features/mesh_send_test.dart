@@ -36,17 +36,21 @@ Future<_Node> _createNode(
 }
 
 /// Drains the async gossip chain (transport → engine → ledger → transport)
-/// and lets pending provider state changes reach the widget tree. Multi-hop
-/// round trips (send → ingest → receipt → delivered) cross several
-/// microtask boundaries, mirroring the pattern A2's controller tests use.
+/// across several microtask boundaries. NOTE: `pumpEventQueue()` deadlocks
+/// under `testWidgets` when the fake clock isn't being driven (its
+/// zero-duration timers never fire) — plain `tester.pump()` drains the
+/// microtask queue the broadcast StreamControllers use.
 Future<void> _flushMesh(WidgetTester tester) async {
-  for (var i = 0; i < 6; i++) {
-    await pumpEventQueue();
+  for (var i = 0; i < 8; i++) {
     await tester.pump();
   }
 }
 
-Future<void> _pump(WidgetTester tester, ProviderContainer container, Widget child) async {
+Future<void> _pump(
+  WidgetTester tester,
+  ProviderContainer container,
+  Widget child,
+) async {
   await tester.pumpWidget(
     UncontrolledProviderScope(
       container: container,
@@ -71,33 +75,39 @@ void main() {
     expect(find.textContaining('No phones nearby'), findsOneWidget);
   });
 
-  testWidgets(
-    'unauthenticated peer name always paired with truncated address; '
-    'unnamed peer falls back to truncated address alone',
-    (tester) async {
-      final sender = await _createNode(containers, 'Me');
-      sender.transport.injectPeer(
-        MeshPeer(addr: 'peerAddr', name: null, rssi: -50, lastSeen: DateTime.now()),
-      );
-      await _pump(tester, sender.container, const MeshSendFlow());
-      expect(find.text(truncateAddr('peerAddr')), findsOneWidget);
+  testWidgets('unauthenticated peer name always paired with truncated address; '
+      'unnamed peer falls back to truncated address alone', (tester) async {
+    final sender = await _createNode(containers, 'Me');
+    sender.transport.injectPeer(
+      MeshPeer(
+        addr: 'peerAddr',
+        name: null,
+        rssi: -50,
+        lastSeen: DateTime.now(),
+      ),
+    );
+    await _pump(tester, sender.container, const MeshSendFlow());
+    expect(find.text(truncateAddr('peerAddr')), findsOneWidget);
 
-      await sender.container.read(peerDirectoryProvider).record('peerAddr', 'Peery');
-      // Re-pump to re-trigger the FutureBuilder's nameFor lookup.
-      await _pump(tester, sender.container, const MeshSendFlow());
-      expect(
-        find.text('Peery · ${truncateAddr('peerAddr')}'),
-        findsOneWidget,
-      );
-    },
-  );
+    await sender.container
+        .read(peerDirectoryProvider)
+        .record('peerAddr', 'Peery');
+    // Re-pump to re-trigger the FutureBuilder's nameFor lookup.
+    await _pump(tester, sender.container, const MeshSendFlow());
+    expect(find.text('Peery · ${truncateAddr('peerAddr')}'), findsOneWidget);
+  });
 
   testWidgets('amount out of range: friendly error, stays on amount phase', (
     tester,
   ) async {
     final sender = await _createNode(containers, 'Me');
     sender.transport.injectPeer(
-      MeshPeer(addr: 'peerAddr', name: 'Peery', rssi: -50, lastSeen: DateTime.now()),
+      MeshPeer(
+        addr: 'peerAddr',
+        name: 'Peery',
+        rssi: -50,
+        lastSeen: DateTime.now(),
+      ),
     );
     await _pump(tester, sender.container, const MeshSendFlow());
     await tester.tap(find.byKey(const Key('mesh.peer.peerAddr')));
@@ -124,7 +134,12 @@ void main() {
     final gate = FakeBiometricGate(approve: false);
     final sender = await _createNode(containers, 'Me', gate: gate);
     sender.transport.injectPeer(
-      MeshPeer(addr: 'peerAddr', name: 'Peery', rssi: -50, lastSeen: DateTime.now()),
+      MeshPeer(
+        addr: 'peerAddr',
+        name: 'Peery',
+        rssi: -50,
+        lastSeen: DateTime.now(),
+      ),
     );
     await _pump(tester, sender.container, const MeshSendFlow());
     await tester.tap(find.byKey(const Key('mesh.peer.peerAddr')));
@@ -148,7 +163,12 @@ void main() {
   ) async {
     final sender = await _createNode(containers, 'Me');
     sender.transport.injectPeer(
-      MeshPeer(addr: 'peerAddr', name: 'Peery', rssi: -50, lastSeen: DateTime.now()),
+      MeshPeer(
+        addr: 'peerAddr',
+        name: 'Peery',
+        rssi: -50,
+        lastSeen: DateTime.now(),
+      ),
     );
     await _pump(tester, sender.container, const MeshSendFlow());
     await tester.tap(find.byKey(const Key('mesh.peer.peerAddr')));
@@ -172,18 +192,16 @@ void main() {
       final hub = LoopbackHub();
       final sender = await _createNode(containers, 'Me');
       final receiver = await _createNode(containers, 'Rex');
-      hub.join(sender.addr, sender.transport);
-      hub.join(receiver.addr, receiver.transport);
-      await pumpEventQueue();
+      // Receiver stays OFFLINE until after the send: the tx must park in
+      // the sender's outbox so 'Hopping' is a stable, assertable state (a
+      // live link delivers + receipts inside pumpAndSettle and races the
+      // transient). The hub comes up after the assert.
       await sender.container
           .read(peerDirectoryProvider)
           .record(receiver.addr, 'Rex');
 
       await _pump(tester, sender.container, const MeshSendFlow());
-      expect(
-        find.text('Rex · ${truncateAddr(receiver.addr)}'),
-        findsOneWidget,
-      );
+      expect(find.text('Rex · ${truncateAddr(receiver.addr)}'), findsOneWidget);
 
       await tester.tap(find.byKey(Key('mesh.peer.${receiver.addr}')));
       await tester.pumpAndSettle();
@@ -192,8 +210,13 @@ void main() {
       await tester.tap(find.byKey(const Key('mesh.send.confirm')));
       await tester.pumpAndSettle();
 
+      // Deterministic: no peers connected -> envelope outboxed -> Hopping.
       expect(find.textContaining('Hopping'), findsOneWidget);
 
+      // Bring both online — peer-connect flushes the outbox
+      // (store-and-forward) and the delivery + receipt complete.
+      hub.join(sender.addr, sender.transport);
+      hub.join(receiver.addr, receiver.transport);
       await _flushMesh(tester);
       await tester.pumpAndSettle();
       expect(find.textContaining('Delivered'), findsOneWidget);
