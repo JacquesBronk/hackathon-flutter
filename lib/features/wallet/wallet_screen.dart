@@ -64,8 +64,9 @@ class WalletScreen extends ConsumerWidget {
                           .read(peerDirectoryProvider)
                           .nameFor(tx.to == addr ? tx.from : tx.to),
                       builder: (_, snap) => Text(
-                        snap.data ??
-                            truncateAddr(tx.to == addr ? tx.from : tx.to),
+                        snap.data == null
+                            ? truncateAddr(tx.to == addr ? tx.from : tx.to)
+                            : '${snap.data} · ${truncateAddr(tx.to == addr ? tx.from : tx.to)}',
                       ),
                     ),
                   ),
