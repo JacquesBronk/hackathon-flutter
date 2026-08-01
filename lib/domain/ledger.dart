@@ -49,9 +49,10 @@ class Ledger {
       return const IngestResult(IngestStatus.rejected, 'invalid mint');
     }
     final ok = await verifyTransactionSignature(
-        from: tx.from,
-        canonicalBytes: canonicalBytesOf(tx),
-        signature: tx.signature);
+      from: tx.from,
+      canonicalBytes: canonicalBytesOf(tx),
+      signature: tx.signature,
+    );
     if (!ok) return const IngestResult(IngestStatus.rejected, 'bad signature');
     _byKey[key] = tx;
     return const IngestResult(IngestStatus.added);
@@ -80,25 +81,34 @@ class Ledger {
 }
 
 /// Create + sign a transaction with [keys] as sender.
-Future<Transaction> buildSigned(
-    {required WalletKeys keys,
-    required String to,
-    required int amount,
-    String? memo,
-    required String type,
-    required int lamportTs,
-    String? id}) async {
+Future<Transaction> buildSigned({
+  required WalletKeys keys,
+  required String to,
+  required int amount,
+  String? memo,
+  required String type,
+  required int lamportTs,
+  String? id,
+}) async {
   final unsigned = Transaction(
-      id: id ?? const Uuid().v7(),
-      type: type,
-      from: keys.address,
-      to: to,
-      amount: amount,
-      memo: memo,
-      lamportTs: lamportTs,
-      signature: '');
+    id: id ?? const Uuid().v7(),
+    type: type,
+    from: keys.address,
+    to: to,
+    amount: amount,
+    memo: memo,
+    lamportTs: lamportTs,
+    signature: '',
+  );
   final sig = await keys.sign(canonicalBytesOf(unsigned));
   return Transaction(
-      id: unsigned.id, type: type, from: keys.address, to: to,
-      amount: amount, memo: memo, lamportTs: lamportTs, signature: sig);
+    id: unsigned.id,
+    type: type,
+    from: keys.address,
+    to: to,
+    amount: amount,
+    memo: memo,
+    lamportTs: lamportTs,
+    signature: sig,
+  );
 }

@@ -42,18 +42,21 @@ class WalletKeys {
 
 /// The signature MUST verify against the key decoded from `from` — anything
 /// else is forgery (spec §2.1).
-Future<bool> verifyTransactionSignature(
-    {required String from,
-    required List<int> canonicalBytes,
-    required String signature}) async {
+Future<bool> verifyTransactionSignature({
+  required String from,
+  required List<int> canonicalBytes,
+  required String signature,
+}) async {
   try {
     final pubBytes = b64uDecode(from);
     final sigBytes = b64uDecode(signature);
     if (pubBytes.length != 32 || sigBytes.length != 64) return false;
     return await _ed25519.verify(
       canonicalBytes,
-      signature: Signature(sigBytes,
-          publicKey: SimplePublicKey(pubBytes, type: KeyPairType.ed25519)),
+      signature: Signature(
+        sigBytes,
+        publicKey: SimplePublicKey(pubBytes, type: KeyPairType.ed25519),
+      ),
     );
   } catch (_) {
     return false;
