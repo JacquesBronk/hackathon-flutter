@@ -20,6 +20,9 @@ class HistoryScreen extends ConsumerWidget {
     }
     final myAddr = keys.address;
     final peerDirectory = ref.watch(peerDirectoryProvider);
+    final deliveries =
+        ref.watch(meshControllerProvider).valueOrNull?.deliveries ??
+        const {};
     final ordered = [...ledgerState.ordered]
       ..sort((a, b) => b.id.compareTo(a.id));
 
@@ -43,11 +46,32 @@ class HistoryScreen extends ConsumerWidget {
                   : (name == null
                         ? truncateAddr(counterparty)
                         : '$name · ${truncateAddr(counterparty)}');
+              final deliveryStatus =
+                  tx.type == txTypeTransfer && tx.from == myAddr
+                  ? deliveries[tx.id]
+                  : null;
               return ExpansionTile(
                 title: Text(title),
-                subtitle: Text(
-                  tx.to == myAddr ? '+ᵽ${tx.amount}' : '−ᵽ${tx.amount}',
-                  style: cmoMoneyStyle(),
+                subtitle: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      tx.to == myAddr ? '+ᵽ${tx.amount}' : '−ᵽ${tx.amount}',
+                      style: cmoMoneyStyle(),
+                    ),
+                    if (deliveryStatus != null) ...[
+                      const SizedBox(width: 8),
+                      Chip(
+                        key: Key('mesh.status.${tx.id}'),
+                        visualDensity: VisualDensity.compact,
+                        label: Text(
+                          deliveryStatus == MeshDeliveryStatus.delivered
+                              ? 'Delivered'
+                              : 'Hopping…',
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
                 children: [
                   if (tx.memo != null) ListTile(title: Text(tx.memo!)),
