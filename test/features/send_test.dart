@@ -2,6 +2,7 @@ import 'package:cash_me_outside/domain/keys.dart';
 import 'package:cash_me_outside/domain/qr_codec.dart';
 import 'package:cash_me_outside/features/send/send_flow.dart';
 import 'package:cash_me_outside/fakes/fakes.dart';
+import 'package:cash_me_outside/fakes/nfc_fakes.dart';
 import 'package:cash_me_outside/providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -81,4 +82,37 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Not a pinnie code'), findsOneWidget);
   });
+
+  testWidgets(
+    'NFC tap (HCE rr read) routes to the same confirm phase as a QR scan',
+    (tester) async {
+      final nfcPort = FakeNfcPort();
+      final container = ProviderContainer(
+        overrides: fakeHardwareOverrides(nfcPort: nfcPort),
+      );
+      addTearDown(container.dispose);
+      await container
+          .read(profileControllerProvider.notifier)
+          .createWallet(name: 'Me', avatar: '🦫');
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(home: SendFlow()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final peer = await WalletKeys.fromSeed(List.filled(32, 8));
+      nfcPort.injectRead(
+        encodeReceiveRequest(
+          ReceiveRequest(addr: peer.address, name: 'Anna', amount: 120),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Anna'), findsOneWidget);
+      expect(find.text(truncateAddr(peer.address)), findsOneWidget);
+      expect(find.byKey(const Key('send.confirm')), findsOneWidget);
+    },
+  );
 }
