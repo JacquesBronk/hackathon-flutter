@@ -79,4 +79,35 @@ repo and deleted after use; it left no trace in this repository.
 
 ## Dependency versions (recorded after Step 3 lands `pubspec.lock`)
 
-<!-- filled in below once dependencies are added -->
+Flutter 3.44.8 / Dart 3.12.2 (from `flutter --version` above, unchanged after
+`pub add`).
+
+Resolved major/full versions from `pubspec.lock`:
+
+| package | resolved version |
+|---|---|
+| `flutter_riverpod` | 2.6.1 (pinned `^2.6.1` per Global Constraints — do not upgrade to 3.x) |
+| `drift` | 2.34.3 |
+| `drift_dev` (dev) | 2.34.5 |
+| `local_auth` | 3.0.2 |
+| `mobile_scanner` | 7.4.0 |
+| `flutter_secure_storage` | 10.3.1 |
+| `sqlite3` (dev) | 3.5.0 |
+
+### minSdk 24 / compileSdk 36 floor check
+
+Checked each plugin's own `android/build.gradle(.kts)` in the pub cache
+(`/tmp/pub-cache/hosted/pub.dev/<pkg>/android/build.gradle*`) rather than
+relying on trained knowledge, since these floors move release to release:
+
+- `local_auth_android-2.0.9`: `compileSdk = flutter.compileSdkVersion` (→ 36),
+  `minSdk = 24`. Exactly matches our config.
+- `mobile_scanner-7.4.0`: `compileSdk = 36`, `minSdk = 23`. Our `minSdk = 24`
+  is above its floor — satisfied.
+- `flutter_secure_storage-10.3.1`: `compileSdk = 36`, `minSdkVersion = 23`.
+  Same — satisfied.
+
+No plugin here demands a `minSdk`/`compileSdk` above what this project sets
+(`android/app/build.gradle.kts`: `compileSdk = 36`, `minSdk = 24`). No AGP-pin
+escape hatch was needed for these three; revisit this table if T4 adds a
+library with a stricter floor.
