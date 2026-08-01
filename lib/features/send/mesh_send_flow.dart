@@ -2,18 +2,24 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../domain/canonical.dart';
 import '../../domain/keys.dart';
 import '../../providers.dart';
+import 'grace_window_widget.dart';
 
-enum _Phase { pick, amount, status }
+const _uuid = Uuid();
+
+enum _Phase { pick, amount, grace, status }
 
 /// Mesh-send flow: peer picker (live mesh peers, unauthenticated names
 /// always paired with the truncated address) → amount/memo → existing
-/// biometric gate → [MeshController.sendMeshTx] → delivery-status screen
-/// keyed by transaction id (`mesh.status.<txId>`), animating hopping →
-/// delivered as receipts arrive.
+/// biometric gate → post-biometric grace window (shake-to-cancel, spec
+/// Global Constraints — aborts before any tx is signed) →
+/// [MeshController.sendMeshTx] → delivery-status screen keyed by
+/// transaction id (`mesh.status.<txId>`), animating hopping → delivered as
+/// receipts arrive.
 class MeshSendFlow extends ConsumerStatefulWidget {
   const MeshSendFlow({super.key, this.initialPeerAddr});
 
@@ -31,6 +37,9 @@ class _MeshSendFlowState extends ConsumerState<MeshSendFlow> {
   MeshPeer? _peer;
   String? _peerName;
   String? _txId;
+  String? _pendingId;
+  int? _pendingAmount;
+  String? _pendingMemo;
   final _amountController = TextEditingController();
   final _memoController = TextEditingController();
 
@@ -79,7 +88,6 @@ class _MeshSendFlowState extends ConsumerState<MeshSendFlow> {
   }
 
   Future<void> _confirm() async {
-    final peer = _peer!;
     final amount = int.tryParse(_amountController.text);
     if (amount == null || amount < 1 || amount > maxAmount) {
       _showSnack("That's not a real amount of pinnies");
@@ -92,15 +100,37 @@ class _MeshSendFlowState extends ConsumerState<MeshSendFlow> {
       _showSnack('Biometric check failed');
       return;
     }
+    final memo = _memoController.text.trim();
+    setState(() {
+      _pendingId = _uuid.v7();
+      _pendingAmount = amount;
+      _pendingMemo = memo.isEmpty ? null : memo;
+      _phase = _Phase.grace;
+    });
+  }
+
+  /// Fires once the post-biometric [GraceWindowWidget] decides: `true` =
+  /// window elapsed undisturbed, so this is the ONE place a mesh send
+  /// actually signs+ingests a tx (spec Global Constraints — shake-cancel
+  /// must abort before `send()`, never after). `false` = aborted; the
+  /// ledger stays untouched and the flow returns to the amount phase.
+  Future<void> _afterGrace(bool decided) async {
+    if (!decided) {
+      setState(() {
+        _phase = _Phase.amount;
+        _pendingId = null;
+        _pendingAmount = null;
+        _pendingMemo = null;
+      });
+      _showSnack('Cancelled — nothing sent');
+      return;
+    }
+    final peer = _peer!;
+    final amount = _pendingAmount!;
     try {
-      final memo = _memoController.text.trim();
       final txId = await ref
           .read(meshControllerProvider.notifier)
-          .sendMeshTx(
-            to: peer.addr,
-            amount: amount,
-            memo: memo.isEmpty ? null : memo,
-          );
+          .sendMeshTx(to: peer.addr, amount: amount, memo: _pendingMemo);
       if (!mounted) return;
       setState(() {
         _txId = txId;
@@ -108,6 +138,7 @@ class _MeshSendFlowState extends ConsumerState<MeshSendFlow> {
       });
     } catch (_) {
       _showSnack("Couldn't send — try again");
+      setState(() => _phase = _Phase.amount);
     }
   }
 
@@ -121,6 +152,8 @@ class _MeshSendFlowState extends ConsumerState<MeshSendFlow> {
         return _buildPicker(context);
       case _Phase.amount:
         return _buildAmount(context);
+      case _Phase.grace:
+        return _buildGrace(context);
       case _Phase.status:
         return _buildStatus(context);
     }
@@ -226,6 +259,18 @@ class _MeshSendFlowState extends ConsumerState<MeshSendFlow> {
               child: const Text('Confirm'),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGrace(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Sending')),
+      body: Center(
+        child: GraceWindowWidget(
+          pendingId: _pendingId!,
+          onDecided: (decided) => unawaited(_afterGrace(decided)),
         ),
       ),
     );
