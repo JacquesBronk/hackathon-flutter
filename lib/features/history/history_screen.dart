@@ -21,8 +21,7 @@ class HistoryScreen extends ConsumerWidget {
     final myAddr = keys.address;
     final peerDirectory = ref.watch(peerDirectoryProvider);
     final deliveries =
-        ref.watch(meshControllerProvider).valueOrNull?.deliveries ??
-        const {};
+        ref.watch(meshControllerProvider).valueOrNull?.deliveries ?? const {};
     final ordered = [...ledgerState.ordered]
       ..sort((a, b) => b.id.compareTo(a.id));
 

@@ -31,9 +31,8 @@ class CashMeOutsideApp extends StatelessWidget {
     child: MaterialApp(
       title: 'Cash Me Outside',
       theme: buildCmoTheme(),
-      builder: (context, child) => enableMeshRealWiring
-          ? _MeshRealWiring(child: child!)
-          : child!,
+      builder: (context, child) =>
+          enableMeshRealWiring ? _MeshRealWiring(child: child!) : child!,
       routes: {
         '/': (_) => const RootGate(),
         '/send': (_) => const SendFlow(),
