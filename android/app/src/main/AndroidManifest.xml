@@ -1,6 +1,28 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
     <uses-permission android:name="android.permission.CAMERA"/>
+    <!-- BLE mesh: Android 12+ (API 31+) runtime Bluetooth permissions.
+         neverForLocation declares this app never derives physical location
+         from scan results, so the system doesn't also require a location
+         permission grant before BLUETOOTH_SCAN works. -->
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE"/>
+    <!-- Legacy Bluetooth permissions for pre-12 (API <= 30) devices, where
+         BLE scanning also required location — covered by the unbounded
+         ACCESS_FINE_LOCATION below (flutter_compass requires it anyway). -->
+    <uses-permission android:name="android.permission.BLUETOOTH"
+        android:maxSdkVersion="30"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"
+        android:maxSdkVersion="30"/>
+    <!-- Required by flutter_compass on Android (magnetometer + location
+         fusion; see its README's Android setup section) and doubles as the
+         pre-12 BLE scan location requirement above. Runtime permission
+         request flow (BLUETOOTH_SCAN/CONNECT + this) is still a
+         device-pass TODO — no emulator/device available in this sandbox to
+         verify the request UX. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <!-- NFC (spec §4): reader/writer only. required="false" because HCE
          tap-mode is device-pass-blocked (no maintained Flutter HCE plugin
          as of 2026-08, see lib/adapters/nfc_adapter.dart) and NTAG sticker

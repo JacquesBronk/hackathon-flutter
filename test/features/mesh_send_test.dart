@@ -2,6 +2,7 @@ import 'package:cash_me_outside/domain/canonical.dart';
 import 'package:cash_me_outside/domain/keys.dart';
 import 'package:cash_me_outside/fakes/fakes.dart';
 import 'package:cash_me_outside/fakes/mesh_fakes.dart';
+import 'package:cash_me_outside/fakes/sensor_fakes.dart';
 import 'package:cash_me_outside/features/history/history_screen.dart';
 import 'package:cash_me_outside/features/send/mesh_send_flow.dart';
 import 'package:cash_me_outside/providers.dart';
@@ -21,10 +22,15 @@ Future<_Node> _createNode(
   String name, {
   FakeMeshTransport? transport,
   FakeBiometricGate? gate,
+  FakeMotionSensor? motionSensor,
 }) async {
   final t = transport ?? FakeMeshTransport();
   final container = ProviderContainer(
-    overrides: fakeHardwareOverrides(meshTransport: t, gate: gate),
+    overrides: fakeHardwareOverrides(
+      meshTransport: t,
+      gate: gate,
+      motionSensor: motionSensor,
+    ),
   );
   registry.add(container);
   await container
@@ -158,6 +164,48 @@ void main() {
     expect(ledgerState.ordered.length, 1); // only the mint
   });
 
+  testWidgets(
+    'shake during the mesh grace window aborts — after biometric approval, '
+    'no tx signed',
+    (tester) async {
+      final motion = FakeMotionSensor();
+      final sender = await _createNode(containers, 'Me', motionSensor: motion);
+      sender.transport.injectPeer(
+        MeshPeer(
+          addr: 'peerAddr',
+          name: 'Peery',
+          rssi: -50,
+          lastSeen: DateTime.now(),
+        ),
+      );
+      await _pump(tester, sender.container, const MeshSendFlow());
+      await tester.tap(find.byKey(const Key('mesh.peer.peerAddr')));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byKey(const Key('mesh.send.amount')), '10');
+      await tester.tap(find.byKey(const Key('mesh.send.confirm')));
+      await tester.pump(); // biometric approves -> phase becomes grace
+      await tester.pump();
+      expect(find.text('Sending… shake to cancel'), findsOneWidget);
+
+      motion.emitShake();
+      await tester.pump();
+      await tester.pumpAndSettle();
+      // The default GraceWindow's real 5s Future.delayed timer keeps
+      // running even after an early abort (only the completer settles
+      // early) — drain it before teardown, matching
+      // grace_window_widget_test.dart's "cancel button" test.
+      await tester.pump(const Duration(seconds: 5));
+
+      expect(find.text('Cancelled — nothing sent'), findsOneWidget);
+      expect(find.byKey(const Key('mesh.send.amount')), findsOneWidget);
+      final ledgerState = await sender.container.read(
+        ledgerControllerProvider.future,
+      );
+      expect(ledgerState.ordered.length, 1); // only the mint
+    },
+  );
+
   testWidgets('empty memo becomes null on the signed transaction', (
     tester,
   ) async {
@@ -208,6 +256,15 @@ void main() {
 
       await tester.enterText(find.byKey(const Key('mesh.send.amount')), '42');
       await tester.tap(find.byKey(const Key('mesh.send.confirm')));
+      await tester.pump(); // biometric approves -> phase becomes grace
+      await tester.pump();
+      // Drive the grace window's real 5s timer forward in explicit steps
+      // rather than relying on pumpAndSettle's animation-frame-driven
+      // looping (GraceWindowWidget's ring AnimationController) to also
+      // advance it — this way the test survives disableAnimations too.
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(milliseconds: 500));
+      }
       await tester.pumpAndSettle();
 
       // Deterministic: no peers connected -> envelope outboxed -> Hopping.

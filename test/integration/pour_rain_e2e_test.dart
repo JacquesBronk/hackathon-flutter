@@ -163,11 +163,9 @@ void main() {
 
       final ticker = StreamController<void>.broadcast();
       addTearDown(ticker.close);
-      // Instant grace window: PourScreen's grace phase is static text (no
-      // AnimationController), so unlike GraceWindowWidget (used by the
-      // QR/mesh confirm flows) nothing keeps pumpAndSettle advancing the
-      // fake clock through a real 5s Future.delayed — see pour_test.dart's
-      // own rig for the same workaround.
+      // Instant grace window: no real Timer, so the test never has to
+      // advance the fake clock — deterministic per the LESSONS constraint
+      // (see pour_test.dart's own rig for the same workaround).
       final instantGrace = GraceWindow(scheduler: (_) async {});
 
       await tester.pumpWidget(

@@ -172,22 +172,29 @@ class PourController extends AsyncNotifier<PourState> {
     _setOutgoing(active: false);
   }
 
-  /// Biometric gate → exactly one signed tx for the accumulated total →
-  /// `state: "final"` envelope announcing the tx id. Returns `false` (no
-  /// tx sent) if there's nothing accumulated or biometrics are denied.
+  /// Biometric gate for the accumulated total (spec §3: post-biometric,
+  /// pre-sign grace runs between this and [finishPour]). Returns `false`
+  /// if there's nothing accumulated or biometrics are denied — the caller
+  /// must not proceed to a grace window or [finishPour] in that case.
+  Future<bool> authenticate() async {
+    await future;
+    final total = _accumulator.pouredTotal;
+    if (_to == null || total <= 0) return false;
+    return ref
+        .read(biometricGateProvider)
+        .authenticate('Confirm sending ᵽ$total');
+  }
+
+  /// Exactly one signed tx for the accumulated total → `state: "final"`
+  /// envelope announcing the tx id. Assumes the caller already gated via
+  /// [authenticate]; returns `false` (no tx sent) if there's nothing
+  /// accumulated.
   Future<bool> finishPour() async {
     await future;
     _cancelSensors();
     final to = _to;
     final total = _accumulator.pouredTotal;
     if (to == null || total <= 0) {
-      _setOutgoing(active: false);
-      return false;
-    }
-    final approved = await ref
-        .read(biometricGateProvider)
-        .authenticate('Confirm sending ᵽ$total');
-    if (!approved) {
       _setOutgoing(active: false);
       return false;
     }

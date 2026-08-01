@@ -251,53 +251,55 @@ void main() {
       await ticker.close();
     });
 
-    test(
-      'finishPour biometric-gates, sends exactly one signed tx, emits final envelope',
-      () async {
-        final ticker = StreamController<void>.broadcast();
-        final controller = container.read(pourControllerProvider.notifier);
-        await controller.startPour(to: 'receiver-addr', ticker: ticker.stream);
-        motion.emitTilt(10);
-        await pumpEventQueue();
-        ticker.add(null);
-        ticker.add(null);
-        await pumpEventQueue();
+    test('authenticate biometric-gates, then finishPour sends exactly one '
+        'signed tx and emits the final envelope', () async {
+      final ticker = StreamController<void>.broadcast();
+      final controller = container.read(pourControllerProvider.notifier);
+      await controller.startPour(to: 'receiver-addr', ticker: ticker.stream);
+      motion.emitTilt(10);
+      await pumpEventQueue();
+      ticker.add(null);
+      ticker.add(null);
+      await pumpEventQueue();
 
-        final pouredBefore = container
-            .read(pourControllerProvider)
-            .value!
-            .outgoing!
-            .pouredTotal;
-        expect(pouredBefore, greaterThan(0));
+      final pouredBefore = container
+          .read(pourControllerProvider)
+          .value!
+          .outgoing!
+          .pouredTotal;
+      expect(pouredBefore, greaterThan(0));
 
-        final sent = await controller.finishPour();
-        await pumpEventQueue();
+      final approved = await controller.authenticate();
+      expect(approved, isTrue);
+      expect(gate.authCalls, 1);
 
-        expect(sent, isTrue);
-        expect(gate.authCalls, 1);
+      final sent = await controller.finishPour();
+      await pumpEventQueue();
 
-        final frames = transport.sentFrames.map(decodeFrame).toList();
-        final txFrames = frames.where((e) => e.kind == envKindTx).toList();
-        expect(txFrames, hasLength(1)); // exactly one signed tx
+      expect(sent, isTrue);
+      // finishPour itself never re-gates — exactly the one authenticate()
+      // call above.
+      expect(gate.authCalls, 1);
 
-        final pourFrames = frames.where((e) => e.kind == envKindPour).toList();
-        final finalFrame = parsePourPayload(pourFrames.last.payload);
-        expect(finalFrame.state, pourStateFinal);
-        expect(finalFrame.pouredTotal, pouredBefore);
-        expect(finalFrame.txId, isNotNull);
+      final frames = transport.sentFrames.map(decodeFrame).toList();
+      final txFrames = frames.where((e) => e.kind == envKindTx).toList();
+      expect(txFrames, hasLength(1)); // exactly one signed tx
 
-        final ledgerState = await container.read(
-          ledgerControllerProvider.future,
-        );
-        expect(
-          ledgerState.ordered.where((t) => t.amount == pouredBefore),
-          hasLength(1),
-        );
-        await ticker.close();
-      },
-    );
+      final pourFrames = frames.where((e) => e.kind == envKindPour).toList();
+      final finalFrame = parsePourPayload(pourFrames.last.payload);
+      expect(finalFrame.state, pourStateFinal);
+      expect(finalFrame.pouredTotal, pouredBefore);
+      expect(finalFrame.txId, isNotNull);
 
-    test('finishPour sends no tx when biometrics are denied', () async {
+      final ledgerState = await container.read(ledgerControllerProvider.future);
+      expect(
+        ledgerState.ordered.where((t) => t.amount == pouredBefore),
+        hasLength(1),
+      );
+      await ticker.close();
+    });
+
+    test('authenticate returns false when biometrics are denied', () async {
       final denyMotion = FakeMotionSensor();
       final denyingContainer = ProviderContainer(
         overrides: fakeHardwareOverrides(
@@ -321,15 +323,29 @@ void main() {
       ticker.add(null);
       await pumpEventQueue();
 
-      final sent = await controller.finishPour();
+      final approved = await controller.authenticate();
       await pumpEventQueue();
 
-      expect(sent, isFalse);
+      // Denied at authenticate() — the screen never calls finishPour(), so
+      // the ledger must stay untouched.
+      expect(approved, isFalse);
       final ledgerState = await denyingContainer.read(
         ledgerControllerProvider.future,
       );
       expect(ledgerState.ordered.where((t) => t.type == 'transfer'), isEmpty);
       await ticker.close();
+    });
+
+    test('authenticate with nothing poured (0 accumulated) returns false '
+        'without gating', () async {
+      final controller = container.read(pourControllerProvider.notifier);
+      await controller.startPour(
+        to: 'receiver-addr',
+        ticker: const Stream.empty(),
+      );
+      final approved = await controller.authenticate();
+      expect(approved, isFalse);
+      expect(gate.authCalls, 0);
     });
 
     test(

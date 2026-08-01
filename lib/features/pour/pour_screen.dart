@@ -2,20 +2,24 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 
+import '../../domain/keys.dart';
 import '../../providers.dart';
 import '../../state/grace_window.dart';
 import '../../theme/coin.dart';
 import '../../theme/tokens.dart';
+import '../send/grace_window_widget.dart';
 
-const _graceWindow = Duration(seconds: 5);
+const _uuid = Uuid();
 const _maxBurstParticles = 6;
 
 enum _Phase { idle, pouring, grace, sending, done, cancelled }
 
 /// Pour-to-pay sender screen (spec §3): tilting streams cosmetic `pour`
 /// envelopes while [PourController] accumulates from tilt at 4Hz. Stopping
-/// arms a shake-to-cancel grace window BEFORE the biometric gate and the
+/// runs the biometric gate, then arms the shake-to-cancel grace window
+/// (post-biometric, pre-sign — same order as the QR/mesh send flows); the
 /// single signed tx money invariant lives in [PourController.finishPour] —
 /// this screen never signs or sends anything itself.
 class PourScreen extends ConsumerStatefulWidget {
@@ -48,6 +52,7 @@ class _PourScreenState extends ConsumerState<PourScreen> {
   _Phase _phase = _Phase.idle;
   int _burstSeq = 0;
   int _lastGain = 0;
+  String? _pendingId;
 
   void _showSnack(String text) {
     if (!mounted) return;
@@ -61,32 +66,44 @@ class _PourScreenState extends ConsumerState<PourScreen> {
         .startPour(to: widget.to, ticker: widget.ticker);
   }
 
-  /// Stops accumulation (no money moved yet), then arms the shake-to-cancel
-  /// grace window; only once it elapses undisturbed does [PourController.
-  /// finishPour] run the biometric gate + the one signed tx.
+  /// Stops accumulation (no money moved yet), runs the biometric gate, then
+  /// arms the shake-to-cancel grace window (spec §3: post-biometric,
+  /// pre-sign) — only once it elapses undisturbed does [_afterGrace] call
+  /// [PourController.finishPour] for the one signed tx.
   Future<void> _stop() async {
     final controller = ref.read(pourControllerProvider.notifier);
     await controller.stopPour();
     if (!mounted) return;
-    setState(() => _phase = _Phase.grace);
 
-    final elapsed = await widget.graceWindow.run(
-      window: _graceWindow,
-      abortSignal: ref.read(motionSensorProvider).shakes,
-    );
+    final approved = await controller.authenticate();
     if (!mounted) return;
-    if (!elapsed) {
-      unawaited(ref.read(hapticsProvider).tick());
+    if (!approved) {
+      setState(() => _phase = _Phase.idle);
+      _showSnack('Biometric check failed');
+      return;
+    }
+
+    setState(() {
+      _pendingId = _uuid.v7();
+      _phase = _Phase.grace;
+    });
+  }
+
+  /// Fires once the post-biometric [GraceWindowWidget] decides: `true` =
+  /// window elapsed undisturbed, so this is the ONE place a pour actually
+  /// signs+sends a tx (spec Global Constraints — shake-cancel must abort
+  /// before `finishPour()`, never after). `false` = aborted; nothing sent.
+  Future<void> _afterGrace(bool decided) async {
+    if (!decided) {
       setState(() => _phase = _Phase.cancelled);
       _showSnack('Pour cancelled — nothing sent');
       return;
     }
-
     setState(() => _phase = _Phase.sending);
-    final sent = await controller.finishPour();
+    final sent = await ref.read(pourControllerProvider.notifier).finishPour();
     if (!mounted) return;
     setState(() => _phase = sent ? _Phase.done : _Phase.idle);
-    if (!sent) _showSnack('Biometric check failed');
+    if (!sent) _showSnack("Couldn't send — try again");
   }
 
   @override
@@ -115,8 +132,12 @@ class _PourScreenState extends ConsumerState<PourScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            if (widget.toName != null)
-              Text(widget.toName!, textAlign: TextAlign.center),
+            Text(
+              widget.toName == null
+                  ? truncateAddr(widget.to)
+                  : '${widget.toName} · ${truncateAddr(widget.to)}',
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: 16),
             SizedBox(
               height: 120,
@@ -154,7 +175,11 @@ class _PourScreenState extends ConsumerState<PourScreen> {
           child: const Text('Stop & send'),
         );
       case _Phase.grace:
-        return const Text('Sending… shake to cancel');
+        return GraceWindowWidget(
+          pendingId: _pendingId!,
+          graceWindow: widget.graceWindow,
+          onDecided: (decided) => unawaited(_afterGrace(decided)),
+        );
       case _Phase.sending:
         return const CircularProgressIndicator();
       case _Phase.done:

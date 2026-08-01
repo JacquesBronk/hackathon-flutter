@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:cash_me_outside/domain/keys.dart';
 import 'package:cash_me_outside/domain/mesh/envelope.dart';
 import 'package:cash_me_outside/fakes/fakes.dart';
 import 'package:cash_me_outside/fakes/mesh_fakes.dart';
@@ -84,6 +85,25 @@ Future<void> _pump(
 
 void main() {
   testWidgets(
+    'unauthenticated peer name is always paired with the truncated address '
+    '(money-moving screen — spec §3 name-display rule)',
+    (tester) async {
+      final rig = await _buildRig(tester);
+
+      await _pump(
+        tester,
+        rig.container,
+        const PourScreen(to: 'receiver-addr', toName: 'Anna'),
+      );
+
+      expect(
+        find.text('Anna · ${truncateAddr('receiver-addr')}'),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
     'tilt pours pinnies, amount updates, stop → grace elapses → biometric → '
     'exactly one signed tx for the poured total',
     (tester) async {
@@ -149,7 +169,8 @@ void main() {
   );
 
   testWidgets(
-    'shake during the grace window aborts — no biometric call, no tx sent',
+    'shake during the grace window aborts — after biometric approval, no '
+    'tx sent',
     (tester) async {
       final rig = await _buildRig(tester);
       final ticker = StreamController<void>.broadcast();
@@ -179,13 +200,17 @@ void main() {
       await tester.pump();
 
       await tester.tap(find.byKey(const Key('pour.stop')));
-      await tester.pump(); // stopPour() resolves, grace window arms
+      await tester.pump(); // stopPour() resolves
+      await tester.pump(); // authenticate() resolves -> grace window arms
       expect(find.textContaining('shake to cancel'), findsOneWidget);
+
+      // Biometric gate runs BEFORE the grace window (spec §3: post-
+      // biometric, pre-sign), so it has already fired by this point.
+      expect(rig.gate.authCalls, 1);
 
       rig.motion.emitShake();
       await tester.pumpAndSettle();
 
-      expect(rig.gate.authCalls, 0);
       expect(
         rig.transport.sentFrames
             .map(decodeFrame)
