@@ -90,8 +90,7 @@ class DriftPeerDirectory implements PeerDirectory {
       .insertOnConflictUpdate(PeerRowsCompanion.insert(addr: addr, name: name));
 
   @override
-  Future<String?> nameFor(String addr) async =>
-      (await (_db.select(
-        _db.peerRows,
-      )..where((t) => t.addr.equals(addr))).getSingleOrNull())?.name;
+  Future<String?> nameFor(String addr) async => (await (_db.select(
+    _db.peerRows,
+  )..where((t) => t.addr.equals(addr))).getSingleOrNull())?.name;
 }
