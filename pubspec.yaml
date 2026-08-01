@@ -48,6 +48,8 @@ dependencies:
   flutter_blue_plus: ^2.3.11
   bluetooth_low_energy: ^6.2.1
   flutter_local_notifications: ^22.2.0
+  sensors_plus: ^7.1.0
+  flutter_compass: ^0.8.1
 
 dev_dependencies:
   flutter_test:
