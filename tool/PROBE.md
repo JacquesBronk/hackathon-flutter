@@ -111,3 +111,15 @@ No plugin here demands a `minSdk`/`compileSdk` above what this project sets
 (`android/app/build.gradle.kts`: `compileSdk = 36`, `minSdk = 24`). No AGP-pin
 escape hatch was needed for these three; revisit this table if T4 adds a
 library with a stricter floor.
+
+### `tool/check.sh` notes for later tasks
+
+- `build_runner 2.15.1` prints `W These options have been removed and were
+  ignored: --delete-conflicting-outputs` — the flag is a no-op on this
+  version, not an error; harmless, left as specified by the plan/spec §6.
+- `flutter analyze` on this Flutter/Dart SDK (3.44.8 / 3.12.2) enforces two
+  lints later tasks may hit fresh: `unnecessary_underscores` (Dart 3.7+ allows
+  repeated `_` as a wildcard pattern — use a single `_` for every unused
+  closure parameter, not `__`, `___`, etc.) and `deprecated_member_use` on
+  `sqlite3`'s `Database.dispose()` (renamed `close()`). Gate is green with
+  these accounted for.
