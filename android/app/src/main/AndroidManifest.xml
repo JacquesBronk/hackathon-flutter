@@ -1,6 +1,13 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
     <uses-permission android:name="android.permission.CAMERA"/>
+    <!-- NFC (spec §4): reader/writer only. required="false" because HCE
+         tap-mode is device-pass-blocked (no maintained Flutter HCE plugin
+         as of 2026-08, see lib/adapters/nfc_adapter.dart) and NTAG sticker
+         features degrade gracefully on hardware without NFC. No
+         <apduservice> registration — add one alongside a real HCE
+         implementation, not before. -->
+    <uses-permission android:name="android.permission.NFC"/>
     <application
         android:label="cash_me_outside"
         android:name="${applicationName}"
@@ -28,6 +35,8 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- HCE apduservice registration belongs here once a maintained
+             plugin lands; see the NFC <uses-permission> comment above. -->
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
@@ -45,4 +54,5 @@
             <data android:mimeType="text/plain"/>
         </intent>
     </queries>
+    <uses-feature android:name="android.hardware.nfc" android:required="false"/>
 </manifest>

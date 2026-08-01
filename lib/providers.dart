@@ -5,6 +5,7 @@ import 'adapters/drift_outbox_store.dart';
 import 'adapters/local_auth_gate.dart';
 import 'adapters/local_notifier.dart';
 import 'adapters/mobile_qr_scanner.dart';
+import 'adapters/nfc_adapter.dart';
 import 'adapters/prefs_profile_store.dart';
 import 'adapters/secure_key_vault.dart';
 import 'domain/keys.dart';
@@ -141,5 +142,6 @@ List<Override> realHardwareOverrides() {
     notifierProvider.overrideWithValue(LocalNotifier()),
     outboxStoreProvider.overrideWithValue(DriftOutboxStore(db)),
     seenStoreProvider.overrideWithValue(DriftSeenStore(db)),
+    nfcPortProvider.overrideWithValue(NfcAdapter()),
   ];
 }
