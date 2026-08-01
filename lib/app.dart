@@ -38,7 +38,10 @@ class CashMeOutsideApp extends StatelessWidget {
         '/send': (_) => const SendFlow(),
         '/receive': (_) => const ReceiveScreen(),
         '/history': (_) => const HistoryScreen(),
-        '/send-mesh': (_) => const MeshSendFlow(),
+        '/send-mesh': (context) => MeshSendFlow(
+          initialPeerAddr:
+              ModalRoute.of(context)?.settings.arguments as String?,
+        ),
         '/radar': (_) => Consumer(
           builder: (context, ref, _) {
             final mesh = ref.watch(meshControllerProvider);

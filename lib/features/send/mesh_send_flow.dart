@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -13,19 +15,48 @@ enum _Phase { pick, amount, status }
 /// keyed by transaction id (`mesh.status.<txId>`), animating hopping →
 /// delivered as receipts arrive.
 class MeshSendFlow extends ConsumerStatefulWidget {
-  const MeshSendFlow({super.key});
+  const MeshSendFlow({super.key, this.initialPeerAddr});
+
+  /// Pre-selects a peer and starts at the amount phase — set when arriving
+  /// from a radar blip tap (spec §2.4). The name is resolved from
+  /// [PeerDirectory]; unauthenticated-name display rules still apply.
+  final String? initialPeerAddr;
 
   @override
   ConsumerState<MeshSendFlow> createState() => _MeshSendFlowState();
 }
 
 class _MeshSendFlowState extends ConsumerState<MeshSendFlow> {
-  _Phase _phase = _Phase.pick;
+  late _Phase _phase;
   MeshPeer? _peer;
   String? _peerName;
   String? _txId;
   final _amountController = TextEditingController();
   final _memoController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    final initialAddr = widget.initialPeerAddr;
+    if (initialAddr == null) {
+      _phase = _Phase.pick;
+    } else {
+      _phase = _Phase.amount;
+      _peer = MeshPeer(
+        addr: initialAddr,
+        name: null,
+        rssi: -127,
+        lastSeen: DateTime.fromMillisecondsSinceEpoch(0),
+      );
+      unawaited(_resolveInitialPeerName(initialAddr));
+    }
+  }
+
+  Future<void> _resolveInitialPeerName(String addr) async {
+    final name = await ref.read(peerDirectoryProvider).nameFor(addr);
+    if (!mounted || name == null) return;
+    setState(() => _peerName = name);
+  }
 
   @override
   void dispose() {

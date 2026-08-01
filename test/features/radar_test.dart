@@ -5,6 +5,7 @@ import 'package:cash_me_outside/domain/mesh/gossip_engine.dart';
 import 'package:cash_me_outside/domain/mesh/envelope.dart';
 import 'package:cash_me_outside/fakes/mesh_fakes.dart';
 import 'package:cash_me_outside/features/radar/radar_screen.dart';
+import 'package:cash_me_outside/features/send/mesh_send_flow.dart';
 import 'package:cash_me_outside/providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart' hide Notifier;
@@ -41,7 +42,9 @@ Future<(ProviderContainer, FakeMeshTransport)> _pumpRadar(
       child: MaterialApp(
         navigatorObservers: observer == null ? const [] : [observer],
         onGenerateRoute: (settings) => MaterialPageRoute(
-          builder: (_) => const SizedBox(),
+          builder: (_) => settings.name == '/send-mesh'
+              ? MeshSendFlow(initialPeerAddr: settings.arguments as String?)
+              : const SizedBox(),
           settings: settings,
         ),
         home: RadarScreen(relayEvents: relayEvents),
@@ -113,6 +116,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(observer.pushed, contains(peer.address));
+    // The tapped blip's addr reaches MeshSendFlow, which prefills straight
+    // to the amount phase for that peer (spec §2.4).
+    expect(find.byKey(const Key('mesh.send.amount')), findsOneWidget);
+    expect(find.textContaining(truncateAddr(peer.address)), findsOneWidget);
   });
 
   testWidgets('relay event triggers a single-run pulse, never loops', (
