@@ -1,4 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'adapters/drift_db.dart';
+import 'adapters/local_auth_gate.dart';
+import 'adapters/mobile_qr_scanner.dart';
+import 'adapters/prefs_profile_store.dart';
+import 'adapters/secure_key_vault.dart';
 import 'domain/keys.dart';
 import 'fakes/fakes.dart';
 import 'ports/biometric_gate.dart';
@@ -70,3 +75,16 @@ List<Override> fakeHardwareOverrides({
   profileStoreProvider.overrideWithValue(InMemoryProfileStore()),
   peerDirectoryProvider.overrideWithValue(InMemoryPeerDirectory()),
 ];
+
+/// Full real-hardware set for on-device runs (`FAKE_HARDWARE=false`).
+List<Override> realHardwareOverrides() {
+  final db = openAppDatabase();
+  return [
+    keyVaultProvider.overrideWithValue(SecureKeyVault()),
+    biometricGateProvider.overrideWithValue(LocalAuthGate()),
+    qrScannerProvider.overrideWithValue(MobileQrScanner()),
+    ledgerStoreProvider.overrideWithValue(DriftLedgerStore(db)),
+    profileStoreProvider.overrideWithValue(PrefsProfileStore()),
+    peerDirectoryProvider.overrideWithValue(DriftPeerDirectory(db)),
+  ];
+}
