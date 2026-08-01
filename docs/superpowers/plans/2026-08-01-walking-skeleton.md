@@ -14,17 +14,20 @@
 
 Every task's requirements implicitly include all of these.
 
-- **Gate (run before claiming done):** `bash tool/check.sh` — build_runner → `dart format --set-exit-if-changed .` → `flutter analyze` → `flutter test`, in that order. Run `dart format .` before committing so generated files are committed formatted.
+- **Gate (run before claiming done):** `bash tool/check.sh` — build_runner → format-check (tracked, non-generated `.dart` files only) → `flutter analyze` → `flutter test`, in that order. `git add` newly created files first or they escape the format check; run `dart format .` before committing.
 - **Protocol constants:** `mintAmount = 500`; valid transfer/mint amount range `1 ≤ amount ≤ 9007199254740991` (2^53−1); mint valid only when `from == to && amount == 500`, at most one counted per address (first in replay order).
 - **Replay order:** ascending `(lamportTs, id)`, `id` compared as a string (bytewise). Balances always derive from full replay in this order. Negative balances are allowed and displayed; sends are never blocked by balance.
 - **Encodings:** address = base64url **no padding** of raw 32-byte Ed25519 public key; signature = base64url no padding of raw 64-byte signature; `id` = lowercase canonical UUIDv7 (`uuid` package `v7()`); ledger set key = lowercase hex SHA-256 of canonical signing bytes.
 - **Canonical signing bytes:** UTF-8 of `jsonEncode` over a map built by inserting keys in exactly this order: `amount, from, id, lamportTs, memo, to, type`. `memo` always present (`null` when empty). `signature` excluded. Verifiers re-canonicalize from parsed fields.
 - **QR formats:** `cmo:rr1:<b64u(json)>` (receive-request `{addr, name, amount?}`) and `cmo:tx1:<b64u(tx json incl. signature)>`. Anything else → `QrDecodeException`, never a crash. rr `name` is unauthenticated: any UI showing it also shows the truncated address.
 - **Android config (T1 owns, nobody else touches `android/`):** applicationId `dev.jcqb.cashmeoutside`; minSdk 24; compileSdk 36; `MainActivity : FlutterFragmentActivity`; launch theme parented on `Theme.AppCompat`; manifest has `USE_BIOMETRIC` + `CAMERA`; `android:allowBackup="false"`.
-- **Shared-surface ownership:** only T1 edits `pubspec.yaml`, `lib/app.dart`, `lib/main.dart`, `analysis_options.yaml`, `tool/check.sh`, `android/`, fonts/assets. T3 creates `lib/providers.dart`; T7 is the only later editor of `lib/main.dart`/`lib/providers.dart`. All other tasks only add/modify files inside their own listed paths.
+- **Shared-surface ownership:** T1 creates `pubspec.yaml`, `analysis_options.yaml`, `tool/check.sh`, `android/`, fonts/assets, `lib/app.dart`, `lib/main.dart`, `test/smoke_test.dart` — and no other task ever touches `pubspec.yaml`, `analysis_options.yaml`, `tool/check.sh`, or `android/`. T3 creates `lib/providers.dart`. T5 rewrites `lib/features/root/root_gate.dart` and `test/smoke_test.dart` (both declared in its Files list). **T7 is the only later editor of `lib/main.dart`, `lib/app.dart`, and `lib/providers.dart`.** All other edits stay inside each task's listed paths.
 - **Tests never use `--dart-define`:** widget tests pass fakes via explicit `ProviderScope(overrides: ...)`. `FAKE_HARDWARE=true` dart-define is only for `flutter run` click-throughs.
 - **No plugin import outside `lib/adapters/`** (exception: `qr_flutter`'s `QrImageView` is UI rendering, allowed in features).
-- **Route names (registered by T1):** `/` (RootGate), `/send`, `/receive`, `/history`.
+- **Route names:** `/` (RootGate, registered by T1); `/send`, `/receive`, `/history` (registered by T7 — they don't exist earlier). Features navigate with `Navigator.pushNamed`; T5/T6 tests pump their screens directly and never depend on route registration.
+- **Wave-4 isolation:** T4∥T5∥T6 run on separate branches/worktrees. Their commits stage only their own listed paths — never `git add -A` inside the parallel wave.
+- **Memo rule:** an empty memo is `null`, never `''` — normalize at every `send()` call site (signed wire format, spec §2.1).
+- **flutter_riverpod stays on 2.x (`^2.6.1`):** the plan's provider code is 2.x-idiomatic; v3 changes retry/exception semantics (failing sentinel providers silently retry). Do not upgrade.
 - **Avatar presets (exact list):** `['🦫','🦜','🐸','🦊','🐙','🦔','🐳','🦩','🐢','🦉','🦄','🐝']`.
 - Commit after each green step-cycle; message style `feat:`/`test:`/`chore:` one-liners.
 
@@ -36,12 +39,12 @@ Every task's requirements implicitly include all of these.
 
 **Files:**
 - Create: entire Flutter scaffold at repo root, `tool/check.sh`, `tool/PROBE.md`, `lib/app.dart`, `lib/theme/tokens.dart`, `lib/theme/coin.dart`, `lib/features/root/root_gate.dart` (placeholder), `assets/fonts/*`
-- Modify: `pubspec.yaml`, `analysis_options.yaml`, `lib/main.dart`, `android/app/build.gradle.kts`, `android/app/src/main/AndroidManifest.xml`, `android/app/src/main/kotlin/dev/jcqb/cashmeoutside/MainActivity.kt`, `android/app/src/main/res/values/styles.xml` (+ `values-night/styles.xml`)
+- Modify: `pubspec.yaml`, `analysis_options.yaml`, `lib/main.dart`, `android/app/build.gradle.kts`, `android/app/src/main/AndroidManifest.xml`, `android/app/src/main/kotlin/dev/jcqb/cash_me_outside/MainActivity.kt`, `android/app/src/main/res/values/styles.xml` (+ `values-night/styles.xml`)
 - Test: `test/theme/coin_test.dart`, `test/smoke_test.dart`
 
 **Interfaces:**
 - Consumes: nothing.
-- Produces: the app shell later tasks live in. `buildCmoTheme() → ThemeData` and `CmoColors.{green,cream,orange,navy,brass}` (`lib/theme/tokens.dart`); `PinnieCoin({double size = 96, bool flipOnBuild = false})` widget (`lib/theme/coin.dart`); `CashMeOutsideApp({List<Override> overrides = const []})` root widget (`lib/app.dart`) with the route table; placeholder `RootGate` widget; `tool/check.sh` gate script; complete dependency set in `pubspec.yaml`.
+- Produces: the app shell later tasks live in. `buildCmoTheme() → ThemeData`, `CmoColors.{green,cream,orange,navy,brass}`, `cmoAmountStyle()`, `cmoMoneyStyle()` (`lib/theme/tokens.dart`); `PinnieCoin({double size = 96, bool flipOnBuild = false})` widget (`lib/theme/coin.dart`); `CashMeOutsideApp({List<Override> overrides = const []})` root widget (`lib/app.dart`) with the route table; placeholder `RootGate` widget; `tool/check.sh` gate script; complete dependency set in `pubspec.yaml`.
 
 - [ ] **Step 1: Toolchain probe — record, decide APK-gate fallback**
 
@@ -61,6 +64,8 @@ cd "$(mktemp -d)" && flutter create probe_apk --org dev.jcqb --platforms android
 
 Record the verdict in `tool/PROBE.md`. **If `APK_UNAVAILABLE`: per spec §6 the APK gates are dropped from this graph (the owner builds locally); do not fail the task — record the fallback and continue.**
 
+Also record in `tool/PROBE.md` (after Step 3 lands the dependencies): the exact Flutter/Dart versions, the resolved major versions of `flutter_riverpod`, `drift`, `local_auth`, `mobile_scanner`, `flutter_secure_storage` from `pubspec.lock`, and a note confirming minSdk 24 / compileSdk 36 still satisfy those plugins' floors (check the package changelogs on pub.dev if the APK build warns).
+
 - [ ] **Step 2: Scaffold the real app**
 
 ```bash
@@ -70,23 +75,38 @@ cd <repo root> && flutter create . --org dev.jcqb --project-name cash_me_outside
 - [ ] **Step 3: Add all dependencies (single owner: this task)**
 
 ```bash
-flutter pub add flutter_riverpod cryptography crypto uuid drift drift_flutter flutter_secure_storage local_auth mobile_scanner qr_flutter shared_preferences
-flutter pub add --dev build_runner drift_dev
+flutter pub add flutter_riverpod:^2.6.1 cryptography crypto uuid drift drift_flutter flutter_secure_storage local_auth mobile_scanner qr_flutter shared_preferences
+flutter pub add --dev build_runner drift_dev sqlite3
+```
+
+(`flutter_riverpod` is deliberately pinned to 2.x — see Global Constraints.) Then create the drift/sqlite headless probe **that T4 depends on**, `test/drift_smoke_test.dart` (kept as a permanent test; record its verdict in `tool/PROBE.md`):
+
+```dart
+import 'package:flutter_test/flutter_test.dart';
+import 'package:sqlite3/sqlite3.dart';
+
+void main() {
+  test('native sqlite3 loads headless on this worker', () {
+    final db = sqlite3.openInMemory();
+    expect(db.select('SELECT 1 AS x').first['x'], 1);
+    db.dispose();
+  });
+}
 ```
 
 - [ ] **Step 4: Android config (exact edits)**
 
-`android/app/src/main/kotlin/dev/jcqb/cashmeoutside/MainActivity.kt` — replace file:
+`android/app/src/main/kotlin/dev/jcqb/cash_me_outside/MainActivity.kt` — the scaffold generates this underscored path/package. **Edit in place and KEEP the generated `package dev.jcqb.cash_me_outside` line** — it must match the gradle `namespace`, or the manifest's `.MainActivity` resolves to a missing class and the app passes every headless gate then crashes at launch on device. Change only the superclass:
 
 ```kotlin
-package dev.jcqb.cashmeoutside
+package dev.jcqb.cash_me_outside
 
 import io.flutter.embedding.android.FlutterFragmentActivity
 
 class MainActivity : FlutterFragmentActivity()
 ```
 
-`android/app/build.gradle.kts` — in `android {}` set `compileSdk = 36`; in `defaultConfig {}` set `applicationId = "dev.jcqb.cashmeoutside"`, `minSdk = 24`.
+`android/app/build.gradle.kts` — in `android {}` set `compileSdk = 36`; in `defaultConfig {}` set `applicationId = "dev.jcqb.cashmeoutside"`, `minSdk = 24`. Leave `namespace` exactly as generated (`dev.jcqb.cash_me_outside`) — only `applicationId` changes.
 
 `android/app/src/main/AndroidManifest.xml` — add above `<application>`:
 
@@ -140,7 +160,10 @@ analyzer:
 set -euo pipefail
 cd "$(dirname "$0")/.."
 dart run build_runner build --delete-conflicting-outputs
-dart format --set-exit-if-changed .
+# Format-check only human-written, tracked Dart files. Generated *.g.dart is
+# emitted by drift_dev's bundled formatter and must never be able to fail the
+# gate (SDK-formatter drift would otherwise livelock it permanently).
+git ls-files '*.dart' | grep -v '\.g\.dart$' | xargs -r dart format --set-exit-if-changed
 flutter analyze
 flutter test
 ```
@@ -196,6 +219,21 @@ TextStyle cmoAmountStyle({double size = 40, Color color = CmoColors.navy}) =>
       fontFamily: 'AlfaSlabOne',
       fontSize: size,
       color: color,
+      fontFeatures: const [FontFeature.tabularFigures()],
+    );
+
+/// Inter with tabular figures — for every NON-hero amount string ('+ᵽ12'
+/// activity rows, history amounts). Spec §2.6: tabular figures wherever
+/// numbers appear, not just the balance hero.
+TextStyle cmoMoneyStyle(
+        {double size = 14,
+        Color color = CmoColors.navy,
+        FontWeight weight = FontWeight.w600}) =>
+    TextStyle(
+      fontFamily: 'Inter',
+      fontSize: size,
+      color: color,
+      fontWeight: weight,
       fontFeatures: const [FontFeature.tabularFigures()],
     );
 
@@ -351,6 +389,8 @@ import 'app.dart';
 
 void main() => runApp(const CashMeOutsideApp());
 ```
+
+Delete the scaffold's template test — it references the removed `MyApp` and breaks both analyze and test: `rm test/widget_test.dart`.
 
 `test/smoke_test.dart`:
 
@@ -701,16 +741,12 @@ void main() {
 
   test('id collision: both distinct-bytes transactions survive', () async {
     final a = await mint(alice, id: '01890000-0000-7000-8000-00000000aaaa');
-    final b = await pay(alice, bob, 9);
-    final c = Transaction(
-        id: a.id, type: b.type, from: b.from, to: b.to, amount: b.amount,
-        memo: b.memo, lamportTs: b.lamportTs, signature: b.signature);
-    // c reuses a's id but b's content — resign it properly:
-    final cSigned = await buildSigned(keys: alice, to: bob.address, amount: 9,
+    // Same id as `a`, different content, validly signed:
+    final collider = await buildSigned(keys: alice, to: bob.address, amount: 9,
         type: txTypeTransfer, lamportTs: 2, id: a.id);
     final l = Ledger();
     expect((await l.ingest(a)).status, IngestStatus.added);
-    expect((await l.ingest(cSigned)).status, IngestStatus.added);
+    expect((await l.ingest(collider)).status, IngestStatus.added);
     expect(l.ordered.length, 2);
   });
 
@@ -756,6 +792,17 @@ void main() {
     await lb.ingest(m2); await lb.ingest(m1);
     expect(la.balances()[alice.address], 500);
     expect(lb.balances()[alice.address], 500);
+    // Observe the (lamportTs, id) tie-break itself, not just the 500:
+    // identical total order under both merge orders, smaller id first.
+    expect(la.ordered.map((t) => t.id).toList(),
+        lb.ordered.map((t) => t.id).toList());
+    expect(la.ordered.first.id, m1.id);
+  });
+
+  test('signed unicode memo survives the full sign→ingest path', () async {
+    final l = Ledger();
+    final t = await pay(alice, bob, 10, memo: 'pizza 🍕 ✨');
+    expect((await l.ingest(t)).status, IngestStatus.added);
   });
 
   test('duplicate ingest is idempotent; unknown type retained but ignored',
@@ -780,8 +827,6 @@ void main() {
   });
 }
 ```
-
-(Delete the stray `final l1 = Ledger()..;` line when writing the real file — shown here to flag: use two fresh ledgers `la`/`lb`.)
 
 Run: `flutter test test/domain/ledger_test.dart` — expected: FAIL.
 
@@ -1332,15 +1377,24 @@ class LedgerState {
 
 class LedgerController extends AsyncNotifier<LedgerState> {
   final _ledger = Ledger();
-  late LamportClock _clock;
+  LamportClock _clock = LamportClock();
+  Future<void>? _ready;
 
-  @override
-  Future<LedgerState> build() async {
+  Future<void> _init() async {
     final store = ref.read(ledgerStoreProvider);
     for (final tx in await store.loadAll()) {
       await _ledger.ingest(tx); // re-validates persisted data (defense in depth)
     }
     _clock = LamportClock(await store.loadLamport());
+  }
+
+  /// Mutating methods race build(): createWallet → mintSelf fires while the
+  /// first build is still mid-flight. Every mutator awaits this first.
+  Future<void> _ensureReady() => _ready ??= _init();
+
+  @override
+  Future<LedgerState> build() async {
+    await _ensureReady();
     return _snapshot();
   }
 
@@ -1348,6 +1402,7 @@ class LedgerController extends AsyncNotifier<LedgerState> {
       LedgerState(balances: _ledger.balances(), ordered: _ledger.ordered);
 
   Future<IngestResult> ingestExternal(Transaction tx) async {
+    await _ensureReady();
     final result = await _ledger.ingest(tx);
     if (result.status == IngestStatus.added) {
       final store = ref.read(ledgerStoreProvider);
@@ -1361,14 +1416,20 @@ class LedgerController extends AsyncNotifier<LedgerState> {
 
   Future<Transaction> send(
       {required String to, required int amount, String? memo}) async {
+    await _ensureReady();
     final keys = (await ref.read(walletKeysProvider.future))!;
     final tx = await buildSigned(keys: keys, to: to, amount: amount,
-        memo: memo, type: txTypeTransfer,
+        memo: (memo == null || memo.isEmpty) ? null : memo, // '' never signed
+        type: txTypeTransfer,
         lamportTs: _clock.next(_ledger.highestLamport));
     // Sender ingests at signing time (spec §4.3) — stranded delivery is
     // recovered by re-showing the tx QR from History.
     final result = await _ledger.ingest(tx);
-    assert(result.status == IngestStatus.added, result.reason ?? '');
+    if (result.status != IngestStatus.added) {
+      // A real thrown error, not a debug assert: a rejected transaction must
+      // never persist, in release builds included.
+      throw StateError('send rejected: ${result.reason}');
+    }
     final store = ref.read(ledgerStoreProvider);
     await store.save(tx);
     await store.saveLamport(_clock.value);
@@ -1377,6 +1438,7 @@ class LedgerController extends AsyncNotifier<LedgerState> {
   }
 
   Future<void> mintSelf() async {
+    await _ensureReady();
     final keys = (await ref.read(walletKeysProvider.future))!;
     final tx = await buildSigned(keys: keys, to: keys.address,
         amount: mintAmount, type: txTypeMint,
@@ -1499,7 +1561,7 @@ git add -A && git commit -m "feat: app-state controllers and provider wiring"
 - Test: `test/adapters/drift_db_test.dart`, `test/adapters/prefs_profile_store_test.dart`
 
 **Interfaces:**
-- Consumes (from T3, exact signatures in T3's Interfaces block): `KeyVault`, `BiometricGate`, `QrScanner`, `LedgerStore`, `ProfileStore`, `PeerDirectory`, `Profile`; (from T2): `Transaction` (`toJson`/`fromJson`), `ledgerKeyOf`.
+- Consumes (from T3 — read the merged `lib/ports/*.dart` and `lib/providers.dart` in the repo for exact signatures): `KeyVault`, `BiometricGate`, `QrScanner`, `LedgerStore`, `ProfileStore`, `PeerDirectory`, `Profile`; (from T2): `Transaction` (`toJson`/`fromJson`), `ledgerKeyOf`.
 - Produces: `AppDatabase(QueryExecutor executor)` (drift, schema v1: tables `LedgerRows{key TEXT PK, json TEXT}`, `PeerRows{addr TEXT PK, name TEXT}`, `MetaRows{k TEXT PK, v TEXT}`); `DriftLedgerStore(AppDatabase db) implements LedgerStore`; `DriftPeerDirectory(AppDatabase db) implements PeerDirectory`; `SecureKeyVault() implements KeyVault`; `LocalAuthGate() implements BiometricGate`; `MobileQrScanner() implements QrScanner`; `PrefsProfileStore() implements ProfileStore`; `AppDatabase openAppDatabase()` (uses `driftDatabase(name: 'cmo')` from drift_flutter).
 
 - [ ] **Step 1: Failing test — drift stores (headless, in-memory)**
@@ -1544,7 +1606,7 @@ void main() {
 }
 ```
 
-Run: `flutter test test/adapters/drift_db_test.dart` — expected: FAIL. (If `NativeDatabase.memory()` fails to load sqlite on this machine, STOP and report — this was probed in T1; do not work around it silently.)
+Run: `flutter test test/adapters/drift_db_test.dart` — expected: FAIL. (If `NativeDatabase.memory()` fails to load sqlite here, STOP and report — T1's `test/drift_smoke_test.dart` probe passed on this environment, so a failure now means something changed; do not work around it silently.)
 
 - [ ] **Step 2: Implement `lib/adapters/drift_db.dart`**
 
@@ -1638,7 +1700,7 @@ class DriftPeerDirectory implements PeerDirectory {
 }
 ```
 
-Run: `dart run build_runner build --delete-conflicting-outputs`, then the drift test — expected: PASS. Commit: `git add -A && git commit -m "feat: drift-backed ledger store and peer directory"`.
+Run: `dart run build_runner build --delete-conflicting-outputs`, then the drift test — expected: PASS. Commit: `git add lib/adapters test/adapters && git commit -m "feat: drift-backed ledger store and peer directory"`.
 
 - [ ] **Step 3: Failing test — prefs profile store**
 
@@ -1781,7 +1843,7 @@ class MobileQrScanner implements QrScanner {
 Run: `bash tool/check.sh` — expected: PASS.
 
 ```bash
-git add -A && git commit -m "feat: plugin adapters (secure storage, local_auth, mobile_scanner)"
+git add lib/adapters test/adapters && git commit -m "feat: plugin adapters (secure storage, local_auth, mobile_scanner)"
 ```
 
 ---
@@ -1792,11 +1854,11 @@ git add -A && git commit -m "feat: plugin adapters (secure storage, local_auth, 
 
 **Files:**
 - Create: `lib/features/onboarding/onboarding_flow.dart`, `lib/features/wallet/wallet_screen.dart`, `lib/features/wallet/radial_send_menu.dart`
-- Modify: `lib/features/root/root_gate.dart` (rewrite the T1 placeholder — this file belongs to T5)
+- Modify: `lib/features/root/root_gate.dart` (rewrite the T1 placeholder — this file belongs to T5), `test/smoke_test.dart` (rewrite — the placeholder expectation dies with the RootGate rewrite)
 - Test: `test/features/onboarding_test.dart`, `test/features/wallet_test.dart`
 
 **Interfaces:**
-- Consumes: everything in T3's `lib/providers.dart` (providers, controllers, `presetAvatars`, `fakeHardwareOverrides`), `PinnieCoin`/`cmoAmountStyle`/`CmoColors` (T1), `truncateAddr` (T2), `CashMeOutsideApp(overrides:)` (T1).
+- Consumes: everything in T3's `lib/providers.dart` (providers, controllers, `presetAvatars`, `fakeHardwareOverrides`), `PinnieCoin`/`cmoAmountStyle`/`cmoMoneyStyle`/`CmoColors` (T1), `truncateAddr` (T2), `CashMeOutsideApp(overrides:)` (T1).
 - Produces: `RootGate` routing: profile null/`onboarded == false` → `OnboardingFlow`; onboarded → `_UnlockScreen` (biometric `authenticate('Unlock your wallet')`, retry button on failure) → `WalletScreen`. `WalletScreen` shows balance (`ᵽ N`, `cmoAmountStyle`, negatives with minus sign), 5 most recent transactions (descending `id` — UUIDv7 ids sort chronologically), and a Send button opening `RadialSendMenu` where only "QR" is enabled → `Navigator.pushNamed('/send')`; the 7 other methods render greyed with a "soon" affordance.
 - Key test-visible strings/keys (T7's end-to-end test relies on these): TextField `Key('onboard.name')`, avatar tiles `Key('onboard.avatar.<emoji>')`, continue buttons `Key('onboard.next')`, mint screen `Key('onboard.mint.next')`, biometric button `Key('onboard.biometric')`, skip `Key('onboard.skip')`; wallet balance `Key('wallet.balance')`, send button `Key('wallet.send')`, radial QR item `Key('send.method.qr')`; unlock retry `Key('unlock.retry')`.
 
@@ -1872,7 +1934,22 @@ class RootGate extends ConsumerWidget {
     final profile = ref.watch(profileControllerProvider);
     return profile.when(
       loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (e, _) => Scaffold(body: Center(child: Text('Storage error: $e'))),
+      // Spec §5: storage errors are RETRYABLE, never dead ends.
+      error: (e, _) => Scaffold(
+        body: Center(
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Text('Storage hiccup — your pinnies are safe.'),
+            const SizedBox(height: 12),
+            FilledButton(
+                key: const Key('root.retry'),
+                onPressed: () {
+                  ref.invalidate(profileControllerProvider);
+                  ref.invalidate(ledgerControllerProvider);
+                },
+                child: const Text('Retry')),
+          ]),
+        ),
+      ),
       data: (p) => (p == null || !p.onboarded)
           ? const OnboardingFlow()
           : const _UnlockScreen(),
@@ -1929,6 +2006,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers.dart';
 import '../../theme/coin.dart';
+import '../../theme/tokens.dart';
 import '../wallet/wallet_screen.dart';
 
 class OnboardingFlow extends ConsumerStatefulWidget {
@@ -1955,10 +2033,13 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
   }
 
   Future<void> _finish() async {
-    await ref.read(profileControllerProvider.notifier).markOnboarded();
-    if (!mounted) return;
+    // Navigate FIRST. Flipping onboarded before leaving rebuilds RootGate
+    // into the unlock screen while this route exits → a second OS biometric
+    // sheet on real devices. (Grab the notifier before this State disposes.)
+    final notifier = ref.read(profileControllerProvider.notifier);
     Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => const WalletScreen()));
+    await notifier.markOnboarded();
   }
 
   @override
@@ -1990,7 +2071,11 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
                   for (final a in presetAvatars)
                     ChoiceChip(
                       key: Key('onboard.avatar.$a'),
-                      label: Text(a, style: const TextStyle(fontSize: 24)),
+                      // Spec §2.6: preset emoji rendered on a brass coin disc.
+                      label: CircleAvatar(
+                          backgroundColor: CmoColors.brass,
+                          radius: 18,
+                          child: Text(a, style: const TextStyle(fontSize: 20))),
                       selected: _avatar == a,
                       onSelected: (_) => setState(() => _avatar = a),
                     ),
@@ -2071,7 +2156,7 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
 
 - [ ] **Step 4: Run onboarding tests**
 
-Run: `flutter test test/features/onboarding_test.dart` — expected: PASS (wallet_screen.dart must exist first — write Step 5's minimal version if needed, then re-run).
+`root_gate.dart` and `onboarding_flow.dart` import `wallet_screen.dart`, so implement Step 6's two wallet files BEFORE this run compiles. Then run: `flutter test test/features/onboarding_test.dart` — expected: PASS.
 
 - [ ] **Step 5: Failing test — wallet home**
 
@@ -2137,7 +2222,9 @@ class WalletScreen extends ConsumerWidget {
     final balance =
         addr == null ? 0 : (ledger.value?.balances[addr] ?? 0);
     final recent = (ledger.value?.ordered ?? []).toList()
-      ..sort((a, b) => b.id.compareTo(a.id)); // UUIDv7 desc = newest first
+      // UUIDv7 desc ≈ newest first (sub-millisecond order is random — cosmetic
+      // only; no test asserts adjacent same-ms ordering).
+      ..sort((a, b) => b.id.compareTo(a.id));
 
     return Scaffold(
       appBar: AppBar(
@@ -2170,10 +2257,16 @@ class WalletScreen extends ConsumerWidget {
                         color: tx.to == addr
                             ? CmoColors.green
                             : CmoColors.orange),
-                    title: Text(tx.to == addr
-                        ? '+ᵽ${tx.amount}'
-                        : '−ᵽ${tx.amount}'),
-                    subtitle: Text(truncateAddr(tx.to == addr ? tx.from : tx.to)),
+                    title: Text(
+                        tx.to == addr ? '+ᵽ${tx.amount}' : '−ᵽ${tx.amount}',
+                        style: cmoMoneyStyle()),
+                    subtitle: FutureBuilder<String?>(
+                      // Spec §2.3: peer name with truncated-address fallback.
+                      future: ref.read(peerDirectoryProvider).nameFor(
+                          tx.to == addr ? tx.from : tx.to),
+                      builder: (_, snap) => Text(snap.data ??
+                          truncateAddr(tx.to == addr ? tx.from : tx.to)),
+                    ),
                   ),
               ],
             ),
@@ -2245,9 +2338,7 @@ void showRadialSendMenu(BuildContext context) {
 }
 ```
 
-- [ ] **Step 7: Full gate + commit**
-
-Run: `bash tool/check.sh` — expected: PASS. (T1's `smoke_test.dart` will now fail since RootGate no longer shows the placeholder text — update it to expect `OnboardingFlow`:)
+- [ ] **Step 7: Rewrite `test/smoke_test.dart`** (declared in this task's Files list — the placeholder expectation dies with the RootGate rewrite):
 
 ```dart
 // test/smoke_test.dart replacement expectation:
@@ -2265,8 +2356,12 @@ void main() {
 }
 ```
 
+- [ ] **Step 8: Full gate + commit**
+
+Run: `bash tool/check.sh` — expected: PASS.
+
 ```bash
-git add -A && git commit -m "feat: onboarding flow, root gate, wallet home"
+git add lib/features test/features test/smoke_test.dart && git commit -m "feat: onboarding flow, root gate, wallet home"
 ```
 
 ---
@@ -2277,11 +2372,11 @@ git add -A && git commit -m "feat: onboarding flow, root gate, wallet home"
 
 **Files:**
 - Create: `lib/features/send/send_flow.dart`, `lib/features/receive/receive_screen.dart`, `lib/features/history/history_screen.dart`
-- Modify: `lib/app.dart` routes — **do NOT edit `lib/app.dart`** (T1 owns it). Instead T7 registers these routes; for tests, this task pumps its screens directly.
+- Modify: (none — route registration belongs to T7; the tests below pump these screens directly)
 - Test: `test/features/send_test.dart`, `test/features/receive_test.dart`, `test/features/history_test.dart`
 
 **Interfaces:**
-- Consumes: T3 providers/controllers (exact signatures in T3), `decodeQr`/`encodeReceiveRequest`/`encodeTransaction`/`ReceiveRequest`/`SignedTransactionPayload`/`QrDecodeException` (T2), `truncateAddr` (T2), `PinnieCoin`, `cmoAmountStyle`, `CmoColors.orange` (T1), `qr_flutter`'s `QrImageView`.
+- Consumes: T3 providers/controllers (read the merged `lib/providers.dart`, `lib/ports/*.dart`, `lib/state/*.dart` in the repo for exact signatures), `decodeQr`/`encodeReceiveRequest`/`encodeTransaction`/`ReceiveRequest`/`SignedTransactionPayload`/`QrDecodeException` (T2), `truncateAddr` (T2), `PinnieCoin`, `cmoAmountStyle`, `cmoMoneyStyle`, `CmoColors.orange` (T1), `qr_flutter`'s `QrImageView`.
 - Produces (T7 wires these as routes): `class SendFlow extends ConsumerStatefulWidget` (`/send`), `class ReceiveScreen extends ConsumerStatefulWidget` (`/receive`), `class HistoryScreen extends ConsumerWidget` (`/history`).
 - Behavior contract: **SendFlow** = scan phase (`qrScannerProvider.buildPreview()` + listen `scans`; on `ReceiveRequest`: `peerDirectory.record(addr, name)`, → confirm phase; on decode failure: SnackBar "Not a pinnie code"; on `SignedTransactionPayload`: SnackBar "That's a payment code — use Receive") → confirm phase (amount prefilled from rr, editable; memo field; recipient name **plus `truncateAddr(addr)`**; `PinnieCoin`; Confirm → `biometricGate.authenticate('Confirm sending ᵽ<amount>')`; denial keeps the screen with SnackBar; success → `ledgerController.send(...)`) → code phase (`QrImageView(data: encodeTransaction(tx))` + "They scanned it — Done" button pops to wallet; **success is manual dismissal**, spec §4.3). **ReceiveScreen** = shows `QrImageView(data: encodeReceiveRequest(...))` for own addr/name with optional amount field; "Scan sender's code" button (`Key('receive.scan')`) swaps QR view ↔ scanner preview; on tx payload: `ledgerController.ingestExternal`; added → green "+ᵽN" state with coin; rejected → SnackBar "Counterfeit pinnies rejected"; duplicate → SnackBar "Already got those". **HistoryScreen** = all transactions, newest first by `id` desc; each `ExpansionTile` (counterparty = `peerDirectory.nameFor(addr)` or `truncateAddr`; expanded: id, lamportTs, memo, full addresses); transfers include "Show code" (`Key('history.showcode.<id>')`) opening a dialog with the tx QR (stranded-delivery recovery, spec §4.5).
 - Test-visible keys: `Key('send.amount')`, `Key('send.memo')`, `Key('send.confirm')`, `Key('send.done')`, `Key('receive.amount')`, `Key('receive.scan')`, `Key('receive.showqr')`.
@@ -2336,7 +2431,9 @@ void main() {
     expect(gate.authCalls, 1);
     expect(find.byType(QrImageView), findsOneWidget);
     final state = await container.read(ledgerControllerProvider.future);
-    expect(state.balances[peer.address], isNull); // recipient not credited here
+    // Send-at-signing: the SENDER's own replay already credits the peer's
+    // address — the peer's device just hasn't ingested anything yet.
+    expect(state.balances[peer.address], 120);
     await tester.tap(find.byKey(const Key('send.done')));
     await tester.pumpAndSettle();
   });
@@ -2465,8 +2562,9 @@ void main() {
         child: const MaterialApp(home: HistoryScreen())));
     await tester.pumpAndSettle();
 
-    expect(find.text('Anna'), findsOneWidget); // peer name, not raw addr
-    await tester.tap(find.text('Anna'));
+    // Unauthenticated peer name always renders WITH the truncated address.
+    expect(find.textContaining('Anna'), findsOneWidget);
+    await tester.tap(find.textContaining('Anna'));
     await tester.pumpAndSettle();
     expect(find.textContaining('coffee'), findsOneWidget);
     await tester.tap(find.byKey(Key('history.showcode.${tx.id}')));
@@ -2480,15 +2578,15 @@ Run: `flutter test test/features/` — expected: FAIL for the three new files.
 
 - [ ] **Step 2: Implement `lib/features/send/send_flow.dart`**
 
-Three-phase `ConsumerStatefulWidget` (`enum _Phase { scan, confirm, code }`). Scan phase subscribes in `initState` via `ref.read(qrScannerProvider).scans.listen(_onScan)` (cancel in `dispose`); `_onScan` wraps `decodeQr` in try/catch: `QrDecodeException` → `ScaffoldMessenger...showSnackBar(SnackBar(content: Text('Not a pinnie code')))`; `SignedTransactionPayload` → SnackBar `"That's a payment code — use Receive"`; `ReceiveRequest rr` → `ref.read(peerDirectoryProvider).record(rr.addr, rr.name)`, prefill `_amount = rr.amount?.toString() ?? ''`, `setState(_Phase.confirm)`. Confirm phase: `TextField(key: Key('send.amount'))` (numeric), `TextField(key: Key('send.memo'))`, recipient row `Text(rr.name)` + `Text(truncateAddr(rr.addr))`, `PinnieCoin(size: 72)`, `FilledButton(key: Key('send.confirm'))` → parse amount (`int.tryParse`, must be ≥1 else SnackBar) → `authenticate('Confirm sending ᵽ$amount')` → false: SnackBar `'Biometric check failed'`, stay; true → `_tx = await ledgerController.send(...)`, `setState(_Phase.code)`. Code phase: `QrImageView(data: encodeTransaction(_tx!), size: 260)`, caption `'Have them scan this with Receive'`, `FilledButton(key: Key('send.done'), onPressed: () => Navigator.of(context).popUntil((r) => r.isFirst))` labeled `'They scanned it — Done'`. Scan phase body: `Expanded(child: ref.read(qrScannerProvider).buildPreview())` with a hazard-orange `CmoColors.orange` scan-frame overlay.
+Three-phase `ConsumerStatefulWidget` (`enum _Phase { scan, confirm, code }`). Scan phase subscribes in `initState` via `ref.read(qrScannerProvider).scans.listen(_onScan)` (cancel in `dispose`); `_onScan` wraps `decodeQr` in try/catch: `QrDecodeException` → `ScaffoldMessenger...showSnackBar(SnackBar(content: Text('Not a pinnie code')))`; `SignedTransactionPayload` → SnackBar `"That's a payment code — use Receive"`; `ReceiveRequest rr` → `ref.read(peerDirectoryProvider).record(rr.addr, rr.name)`, prefill `_amount = rr.amount?.toString() ?? ''`, `setState(_Phase.confirm)`. Confirm phase: `TextField(key: Key('send.amount'))` (numeric), `TextField(key: Key('send.memo'))`, recipient row `Text(rr.name)` + `Text(truncateAddr(rr.addr))`, `PinnieCoin(size: 72)`, `FilledButton(key: Key('send.confirm'))` → parse amount (`int.tryParse`; must satisfy `1 <= amount <= maxAmount` else SnackBar `"That's not a real amount of pinnies"`) → `authenticate('Confirm sending ᵽ$amount')` → false: SnackBar `'Biometric check failed'`, stay; true → `_tx = await ledgerController.send(to: rr.addr, amount: amount, memo: _memo.text.trim().isEmpty ? null : _memo.text.trim())` (empty memo is `null`, never `''` — signed wire format) in a try/catch: on error SnackBar `"Couldn't save — try again"` and stay on confirm; success → `setState(_Phase.code)`. Code phase: `QrImageView(data: encodeTransaction(_tx!), size: 260)`, caption `'Have them scan this with Receive'`, `FilledButton(key: Key('send.done'), onPressed: () => Navigator.of(context).popUntil((r) => r.isFirst))` labeled `'They scanned it — Done'`. Scan phase body: `Expanded(child: ref.read(qrScannerProvider).buildPreview())` with a hazard-orange `CmoColors.orange` scan-frame overlay.
 
 - [ ] **Step 3: Implement `lib/features/receive/receive_screen.dart`**
 
-`ConsumerStatefulWidget`, `bool _scanning = false`, result banner state. Default view: own rr QR — reads `walletKeysProvider` + `profileControllerProvider`, optional `TextField(key: Key('receive.amount'))`; QR data rebuilt on amount change: `encodeReceiveRequest(ReceiveRequest(addr: myAddr, name: profile.name, amount: int.tryParse(...)))`. `OutlinedButton(key: Key('receive.scan'), child: Text("Scan sender's code"))` → `_scanning = true` (subscribe to scans; swap body for preview; `TextButton(key: Key('receive.showqr'))` returns). On scan: decode; `SignedTransactionPayload` → `ingestExternal`; `IngestStatus.added` → `_scanning = false`, banner `'+ᵽ${tx.amount}'` in `CmoColors.green` with `PinnieCoin(flipOnBuild: true)`; `rejected` → SnackBar `'Counterfeit pinnies rejected'`; `duplicate` → SnackBar `'Already got those'`; `ReceiveRequest`/`QrDecodeException` → SnackBar `'Not a pinnie code'`.
+`ConsumerStatefulWidget`, `bool _scanning = false`, result banner state. Default view: own rr QR — reads `walletKeysProvider` + `profileControllerProvider`, optional `TextField(key: Key('receive.amount'))`; QR data rebuilt on amount change: `encodeReceiveRequest(ReceiveRequest(addr: myAddr, name: profile.name, amount: int.tryParse(...)))`. `OutlinedButton(key: Key('receive.scan'), child: Text("Scan sender's code"))` → `_scanning = true` (subscribe to scans; swap body for preview; `TextButton(key: Key('receive.showqr'))` returns). On scan: decode; `SignedTransactionPayload` → `ingestExternal`; `IngestStatus.added` → `_scanning = false`, banner `'+ᵽ${tx.amount}'` in `CmoColors.green` with `PinnieCoin(flipOnBuild: true)`; `rejected` → SnackBar `'Counterfeit pinnies rejected'`; `duplicate` → SnackBar `'Already got those'` (intentional UI feedback — ledger-level idempotence stays silent per spec §5); `ReceiveRequest` → SnackBar `"That's a request code — use Send"` (it IS a valid pinnie code, just the wrong kind); `QrDecodeException` → SnackBar `'Not a pinnie code'`.
 
 - [ ] **Step 4: Implement `lib/features/history/history_screen.dart`**
 
-`ConsumerWidget`. `ordered` from ledger state sorted `b.id.compareTo(a.id)` (UUIDv7 desc = newest first). Each row: `FutureBuilder(peerDirectory.nameFor(counterpartyAddr))` → `ExpansionTile(title: Text(name ?? truncateAddr(addr)), subtitle: Text(tx.to == myAddr ? '+ᵽ${tx.amount}' : '−ᵽ${tx.amount}'))`; children: memo (if any), `id`, `lamportTs`, full from/to addresses (`SelectableText`), and for `type == txTypeTransfer` where `from == myAddr`: `TextButton(key: Key('history.showcode.${tx.id}'), child: Text('Show code'))` → `showDialog` with `QrImageView(data: encodeTransaction(tx), size: 240)` (stranded-delivery recovery). Mint rows labeled `'Minted'`.
+`ConsumerWidget`. `ordered` from ledger state sorted `b.id.compareTo(a.id)` (UUIDv7 desc = newest first). Each row: `FutureBuilder(peerDirectory.nameFor(counterpartyAddr))` → `ExpansionTile(title: Text(name == null ? truncateAddr(addr) : '$name · ${truncateAddr(addr)}'), subtitle: Text(tx.to == myAddr ? '+ᵽ${tx.amount}' : '−ᵽ${tx.amount}', style: cmoMoneyStyle()))` — the rr-sourced name is unauthenticated, so it never renders without the truncated address beside it (spec §3); children: memo (if any), `id`, `lamportTs`, full from/to addresses (`SelectableText`), and for `type == txTypeTransfer` where `from == myAddr`: `TextButton(key: Key('history.showcode.${tx.id}'), child: Text('Show code'))` → `showDialog` with `QrImageView(data: encodeTransaction(tx), size: 240)` (stranded-delivery recovery). Mint rows labeled `'Minted'`.
 
 - [ ] **Step 5: Run the three feature tests**
 
@@ -2499,7 +2597,7 @@ Run: `flutter test test/features/send_test.dart test/features/receive_test.dart 
 Run: `bash tool/check.sh` — expected: PASS.
 
 ```bash
-git add -A && git commit -m "feat: send flow, receive screen, history with tx-QR recovery"
+git add lib/features/send lib/features/receive lib/features/history test/features/send_test.dart test/features/receive_test.dart test/features/history_test.dart && git commit -m "feat: send flow, receive screen, history with tx-QR recovery"
 ```
 
 ---
@@ -2513,7 +2611,7 @@ git add -A && git commit -m "feat: send flow, receive screen, history with tx-QR
 - Test: `test/integration/two_party_flow_test.dart`
 
 **Interfaces:**
-- Consumes: everything produced by T1–T6 (exact names in their Interfaces blocks).
+- Consumes: everything produced by T1–T6 — read the merged repo source for exact names; do not guess.
 - Produces: `List<Override> realHardwareOverrides()` in `lib/providers.dart` (drift + secure storage + local_auth + mobile_scanner + prefs); `main()` that selects fake vs real via `const bool.fromEnvironment('FAKE_HARDWARE')`; the shipped debug APK.
 
 - [ ] **Step 1: Wire routes in `lib/app.dart`**
@@ -2584,6 +2682,10 @@ void main() {
     final container = ProviderContainer(
         overrides: fakeHardwareOverrides(scanner: scanner));
     addTearDown(container.dispose);
+    // NOTE: overrides live on the CONTAINER only. CashMeOutsideApp's inner
+    // ProviderScope must stay override-free under this harness — passing
+    // overrides to the app would fork those providers into the child scope
+    // and silently diverge from what container.read(...) sees.
     await tester.pumpWidget(UncontrolledProviderScope(
         container: container, child: const CashMeOutsideApp()));
     await tester.pumpAndSettle();
@@ -2658,6 +2760,10 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('onboard.biometric')));
     await tester.pumpAndSettle();
+    // Tear the tree down COMPLETELY before disposing: pumping the identical
+    // const widget again would never rebuild it, and the inner ProviderScope
+    // would wrap a disposed container (ancestor-change assert in riverpod).
+    await tester.pumpWidget(const SizedBox());
     container.dispose();
 
     // "Relaunch": same stores, fresh container — must hit unlock then wallet.
@@ -2692,9 +2798,11 @@ git add -A && git commit -m "feat: real adapter wiring, routes, two-party e2e te
 
 ### Task 8: Independent conformance review (gate)
 
-**Bureau:** T8, Wave 5, depends on T7. Reviewer task — reads code, runs checks, produces a verdict. **Do not fix code; report findings.** Workers' green is not trusted without this gate.
+**Bureau:** T8, Wave 6, depends on T7. Reviewer task — reads code, runs checks, produces a verdict. **Do not fix code; report findings.** Workers' green is not trusted without this gate.
 
 **Files:** none created (a findings report is the deliverable, returned as the task result).
+
+**First action:** read the normative spec at `docs/superpowers/specs/2026-08-01-walking-skeleton-design.md` — the §-references below point into it.
 
 **Checklist (each item: state PASS/FAIL with file:line evidence):**
 
@@ -2705,7 +2813,8 @@ git add -A && git commit -m "feat: real adapter wiring, routes, two-party e2e te
 - [ ] Fake/adapter parity: every port has both a fake and an adapter with matching semantics (e.g. drift store upsert vs in-memory append — confirm `loadAll` after double-save yields one row in both).
 - [ ] Android config per spec §2.4: `FlutterFragmentActivity`, AppCompat launch theme (both values/ and values-night/), `USE_BIOMETRIC`, `CAMERA`, `allowBackup="false"`, minSdk 24, compileSdk 36, applicationId `dev.jcqb.cashmeoutside`.
 - [ ] No plugin imports outside `lib/adapters/` (allowed exception: `qr_flutter` in features); no feature imports of `lib/adapters/`.
-- [ ] `tool/check.sh` passes from a clean checkout (`git stash -u` any local noise first); test names claimed in Tasks 2–7 all exist and run.
+- [ ] `tool/check.sh` passes **twice consecutively** from a clean state (`git stash -u` any noise, `rm -rf .dart_tool`, run, run again — catches any codegen/format livelock). The full expected test-file inventory exists and runs: `test/smoke_test.dart`, `test/drift_smoke_test.dart`, `test/theme/coin_test.dart`, `test/domain/canonical_test.dart`, `test/domain/keys_test.dart`, `test/domain/ledger_test.dart`, `test/domain/qr_codec_test.dart`, `test/fakes/fakes_test.dart`, `test/state/controllers_test.dart`, `test/adapters/drift_db_test.dart`, `test/adapters/prefs_profile_store_test.dart`, `test/features/onboarding_test.dart`, `test/features/wallet_test.dart`, `test/features/send_test.dart`, `test/features/receive_test.dart`, `test/features/history_test.dart`, `test/integration/two_party_flow_test.dart`.
+- [ ] Per-task gate audit: `git log --oneline` shows the expected per-task commit sequence, and `tool/check.sh` passes at HEAD (proxy for every task having run its gate).
 - [ ] rr `name` is never displayed without the truncated address beside it (spec §3).
 - [ ] Sender-side stranded-delivery recovery exists: History exposes the tx QR for own outgoing transfers.
 - [ ] `tool/PROBE.md` exists and records the toolchain verdict; if APK_OK, a debug APK build was reported by T7.
@@ -2717,5 +2826,6 @@ Return the completed checklist with evidence as the task result.
 ## Plan Self-Review (completed)
 
 - **Spec coverage:** §1 flows → T5/T6/T7; §2.1 → T2; §2.2 → T2; §2.3 ports → T3; §2.4 adapters + Android → T4/T1; §2.5 fakes → T3; §2.6 theme → T1; §3 QR → T2; §4 screens → T5/T6; §5 error handling → T2 (codec/ledger) + T6 (UI paths); §6 gates → T1 check.sh + per-task steps + T8; §7 graph → task headers. Human device pass stays with the owner (spec §6) — not a plan task.
-- **Known deviation from spec sketch:** spec §7 put T2∥T3 in one wave; this plan serializes them (T3 imports T2's `Transaction`/`WalletKeys`) and runs T4∥T5∥T6 in the wave after. Spec §7 explicitly delegates final graph shape to kickoff.
+- **Known deviations from spec sketch (all declared):** spec §7 put T2∥T3 in one wave; this plan serializes them (T3 imports T2's `Transaction`/`WalletKeys`) and runs T4∥T5∥T6 in the wave after. Ownership deviations: `lib/providers.dart` is created by T3, not T1 (it imports T3's ports); the three feature routes are registered by T7, not T1 (the screens don't exist earlier); T5 rewrites `root_gate.dart` and `test/smoke_test.dart`. Spec §7 explicitly delegates final graph shape to kickoff.
+- **Rev 2 (2026-08-01):** folded in a 3-lens adversarial review (spec conformance, code correctness verified against current package versions, isolated-worker orchestration) — 5 blockers and ~10 majors fixed, including: send-test recipient-balance assertion, template `widget_test.dart` deletion, MainActivity namespace preservation, riverpod 2.x pin, `_clock` init race, double biometric prompt, format-gate exclusion of generated files, drift/sqlite probe moved into T1, empty-memo normalization, storage-error retry, Wave-4 branch isolation + scoped commits, relaunch-test teardown, and T8 self-containment.
 - **Type consistency:** provider names, controller methods, widget keys, and domain signatures are declared once in their producing task's Interfaces block and repeated verbatim where consumed.
