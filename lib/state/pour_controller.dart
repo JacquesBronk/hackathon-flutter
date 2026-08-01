@@ -167,7 +167,7 @@ class PourController extends AsyncNotifier<PourState> {
   /// moved — [finishPour] is the only path that signs a tx.
   Future<void> stopPour() async {
     await future;
-    await _cancelSensors();
+    _cancelSensors();
     _emitEnvelope(pourStateStopped);
     _setOutgoing(active: false);
   }
@@ -177,7 +177,7 @@ class PourController extends AsyncNotifier<PourState> {
   /// tx sent) if there's nothing accumulated or biometrics are denied.
   Future<bool> finishPour() async {
     await future;
-    await _cancelSensors();
+    _cancelSensors();
     final to = _to;
     final total = _accumulator.pouredTotal;
     if (to == null || total <= 0) {
@@ -199,9 +199,14 @@ class PourController extends AsyncNotifier<PourState> {
     return true;
   }
 
-  Future<void> _cancelSensors() async {
-    await _tiltSub?.cancel();
-    await _tickerSub?.cancel();
+  // Fire-and-forget, matching MeshController/RadarScreen's convention: a
+  // cancelled subscription stops delivering events synchronously (the
+  // returned Future only tracks an onCancel callback, which these streams
+  // never register), and awaiting it here previously deadlocked under
+  // testWidgets (LESSON — see plan handoff).
+  void _cancelSensors() {
+    unawaited(_tiltSub?.cancel());
+    unawaited(_tickerSub?.cancel());
     _tiltSub = null;
     _tickerSub = null;
   }
