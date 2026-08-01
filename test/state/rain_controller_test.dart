@@ -45,7 +45,10 @@ void main() {
     });
 
     test('throws with no recipients', () {
-      expect(() => splitRain(10, const [], random: Random(1)), throwsArgumentError);
+      expect(
+        () => splitRain(10, const [], random: Random(1)),
+        throwsArgumentError,
+      );
     });
   });
 
@@ -131,17 +134,20 @@ void main() {
       expect(ledgerState.ordered.where((t) => t.type == 'transfer'), isEmpty);
     });
 
-    test('invalid split (total < recipients) throws before biometric', () async {
-      final controller = container.read(rainControllerProvider.notifier);
-      await expectLater(
-        () => controller.makeItRain(
-          total: 1,
-          recipients: ['a', 'b', 'c'],
-          random: Random(1),
-        ),
-        throwsArgumentError,
-      );
-      expect(gate.authCalls, 0);
-    });
+    test(
+      'invalid split (total < recipients) throws before biometric',
+      () async {
+        final controller = container.read(rainControllerProvider.notifier);
+        await expectLater(
+          () => controller.makeItRain(
+            total: 1,
+            recipients: ['a', 'b', 'c'],
+            random: Random(1),
+          ),
+          throwsArgumentError,
+        );
+        expect(gate.authCalls, 0);
+      },
+    );
   });
 }

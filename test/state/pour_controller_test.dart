@@ -263,8 +263,11 @@ void main() {
         ticker.add(null);
         await pumpEventQueue();
 
-        final pouredBefore =
-            container.read(pourControllerProvider).value!.outgoing!.pouredTotal;
+        final pouredBefore = container
+            .read(pourControllerProvider)
+            .value!
+            .outgoing!
+            .pouredTotal;
         expect(pouredBefore, greaterThan(0));
 
         final sent = await controller.finishPour();
@@ -311,9 +314,7 @@ void main() {
       await denyingContainer.read(pourControllerProvider.future);
 
       final ticker = StreamController<void>.broadcast();
-      final controller = denyingContainer.read(
-        pourControllerProvider.notifier,
-      );
+      final controller = denyingContainer.read(pourControllerProvider.notifier);
       await controller.startPour(to: 'receiver-addr', ticker: ticker.stream);
       denyMotion.emitTilt(10);
       await pumpEventQueue();
@@ -331,16 +332,19 @@ void main() {
       await ticker.close();
     });
 
-    test('finishPour with nothing poured (0 accumulated) sends no tx', () async {
-      final controller = container.read(pourControllerProvider.notifier);
-      await controller.startPour(
-        to: 'receiver-addr',
-        ticker: const Stream.empty(),
-      );
-      final sent = await controller.finishPour();
-      expect(sent, isFalse);
-      expect(gate.authCalls, 0);
-    });
+    test(
+      'finishPour with nothing poured (0 accumulated) sends no tx',
+      () async {
+        final controller = container.read(pourControllerProvider.notifier);
+        await controller.startPour(
+          to: 'receiver-addr',
+          ticker: const Stream.empty(),
+        );
+        final sent = await controller.finishPour();
+        expect(sent, isFalse);
+        expect(gate.authCalls, 0);
+      },
+    );
 
     test('incoming pour envelopes fold into catch state', () async {
       final other = await container.read(walletKeysProvider.future);
