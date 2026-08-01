@@ -52,9 +52,7 @@ class MeshController extends AsyncNotifier<MeshState> {
     final subs = <StreamSubscription<Object?>>[
       _engine.outboundFrames.listen(_transport.broadcastFrame),
       _engine.seenAdditions.listen(seenStore.add),
-      _engine.outboxPuts.listen(
-        (e) => _outboxStore.put(e.$1, e.$2, e.$3),
-      ),
+      _engine.outboxPuts.listen((e) => _outboxStore.put(e.$1, e.$2, e.$3)),
       _engine.outboxClears.listen(_outboxStore.remove),
       _engine.delivered.listen(_handleDelivered),
       _engine.relays.listen(_handleRelay),
@@ -139,7 +137,8 @@ class MeshController extends AsyncNotifier<MeshState> {
   }
 
   void _setDelivery(String txId, MeshDeliveryStatus status) {
-    final current = state.valueOrNull ?? const MeshState(livePeers: [], deliveries: {});
+    final current =
+        state.valueOrNull ?? const MeshState(livePeers: [], deliveries: {});
     state = AsyncData(
       MeshState(
         livePeers: current.livePeers,

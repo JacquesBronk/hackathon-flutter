@@ -80,8 +80,9 @@ final ledgerControllerProvider =
     AsyncNotifierProvider<LedgerController, LedgerState>(LedgerController.new);
 final profileControllerProvider =
     AsyncNotifierProvider<ProfileController, Profile?>(ProfileController.new);
-final meshControllerProvider =
-    AsyncNotifierProvider<MeshController, MeshState>(MeshController.new);
+final meshControllerProvider = AsyncNotifierProvider<MeshController, MeshState>(
+  MeshController.new,
+);
 
 /// Full fake set for tests and FAKE_HARDWARE runs. Pass specific instances
 /// when a test needs to drive them (emit scans, deny biometrics, inject
