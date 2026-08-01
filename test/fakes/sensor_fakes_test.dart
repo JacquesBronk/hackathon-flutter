@@ -26,4 +26,16 @@ void main() {
     await haptics.tick();
     expect(haptics.tickCount, 2);
   });
+
+  test('FakeCompassPort emits injected headings', () async {
+    final compass = FakeCompassPort();
+    final headings = <double>[];
+    final sub = compass.headingRadians.listen(headings.add);
+
+    compass.emitHeadingRadians(1.5);
+    await pumpEventQueue();
+
+    expect(headings, [1.5]);
+    await sub.cancel();
+  });
 }
