@@ -172,4 +172,48 @@ void main() {
       );
     }
   });
+
+  test('pourPayload/parsePourPayload round trip without txId', () {
+    final payload = pourPayload(
+      sessionId: 'session-1',
+      seq: 3,
+      pouredTotal: 12,
+      state: pourStatePouring,
+    );
+    expect(payload.contains('txId'), isFalse);
+    final parsed = parsePourPayload(payload);
+    expect(parsed.sessionId, 'session-1');
+    expect(parsed.seq, 3);
+    expect(parsed.pouredTotal, 12);
+    expect(parsed.state, pourStatePouring);
+    expect(parsed.txId, isNull);
+  });
+
+  test('pourPayload/parsePourPayload round trip with txId (final state)', () {
+    final payload = pourPayload(
+      sessionId: 'session-2',
+      seq: 9,
+      pouredTotal: 25,
+      state: pourStateFinal,
+      txId: 'tx-abc',
+    );
+    final parsed = parsePourPayload(payload);
+    expect(parsed.state, pourStateFinal);
+    expect(parsed.txId, 'tx-abc');
+  });
+
+  test('parsePourPayload throws FormatException on malformed input', () {
+    for (final bad in [
+      'not json',
+      '{}',
+      '{"sessionId":"s","seq":1,"pouredTotal":1}',
+      '{"sessionId":1,"seq":1,"pouredTotal":1,"state":"pouring"}',
+      '{"sessionId":"s","seq":"1","pouredTotal":1,"state":"pouring"}',
+      '{"sessionId":"s","seq":1,"pouredTotal":"1","state":"pouring"}',
+      '{"sessionId":"s","seq":1,"pouredTotal":1,"state":1}',
+      '{"sessionId":"s","seq":1,"pouredTotal":1,"state":"pouring","txId":1}',
+    ]) {
+      expect(() => parsePourPayload(bad), throwsFormatException, reason: bad);
+    }
+  });
 }
