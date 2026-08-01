@@ -179,6 +179,12 @@ class _ReceiveScreenState extends ConsumerState<ReceiveScreen> {
               ],
             ),
           ),
+        const SizedBox(height: 8),
+        TextButton(
+          key: const Key('nfc.stickerStudio'),
+          onPressed: () => Navigator.pushNamed(context, '/nfc'),
+          child: const Text('Write NFC stickers'),
+        ),
       ],
     );
   }

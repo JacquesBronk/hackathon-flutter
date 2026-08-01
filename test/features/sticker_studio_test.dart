@@ -36,21 +36,22 @@ Future<ProviderContainer> pumpStickerStudio(
 }
 
 void main() {
-  testWidgets('write request sticker writes an rr1 tag with the entered amount', (
-    tester,
-  ) async {
-    await pumpStickerStudio(tester);
-    await tester.enterText(
-      find.byKey(const Key('sticker.request.amount')),
-      '15',
-    );
-    await tester.tap(find.byKey(const Key('nfc.write.request')));
-    await tester.pumpAndSettle();
+  testWidgets(
+    'write request sticker writes an rr1 tag with the entered amount',
+    (tester) async {
+      await pumpStickerStudio(tester);
+      await tester.enterText(
+        find.byKey(const Key('sticker.request.amount')),
+        '15',
+      );
+      await tester.tap(find.byKey(const Key('nfc.write.request')));
+      await tester.pumpAndSettle();
 
-    expect(nfcPort.writtenTags, hasLength(1));
-    final rr = decodeQr(nfcPort.writtenTags.single) as ReceiveRequest;
-    expect(rr.amount, 15);
-  });
+      expect(nfcPort.writtenTags, hasLength(1));
+      final rr = decodeQr(nfcPort.writtenTags.single) as ReceiveRequest;
+      expect(rr.amount, 15);
+    },
+  );
 
   testWidgets('write voucher sticker requires biometric approval', (
     tester,
@@ -103,8 +104,9 @@ void main() {
       );
 
       final container = await pumpStickerStudio(tester);
-      final selfAddr = (await container.read(walletKeysProvider.future))!
-          .address;
+      final selfAddr = (await container.read(
+        walletKeysProvider.future,
+      ))!.address;
 
       expect(find.byKey(const Key('nfc.claim.result')), findsNothing);
 

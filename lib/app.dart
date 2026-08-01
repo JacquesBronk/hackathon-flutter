@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'domain/keys.dart';
 import 'features/history/history_screen.dart';
+import 'features/nfc/sticker_studio.dart';
 import 'features/radar/radar_screen.dart';
 import 'features/receive/receive_screen.dart';
 import 'features/root/root_gate.dart';
@@ -38,6 +39,7 @@ class CashMeOutsideApp extends StatelessWidget {
         '/send': (_) => const SendFlow(),
         '/receive': (_) => const ReceiveScreen(),
         '/history': (_) => const HistoryScreen(),
+        '/nfc': (_) => const StickerStudio(),
         '/send-mesh': (context) => MeshSendFlow(
           initialPeerAddr:
               ModalRoute.of(context)?.settings.arguments as String?,

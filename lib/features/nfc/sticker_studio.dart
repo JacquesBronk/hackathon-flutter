@@ -55,7 +55,9 @@ class _StickerStudioState extends ConsumerState<StickerStudio> {
         .writeVoucherTag(amount);
     if (!mounted) return;
     _showSnack(
-      wrote ? 'Voucher sticker written — first to sync wins' : 'Biometric check failed',
+      wrote
+          ? 'Voucher sticker written — first to sync wins'
+          : 'Biometric check failed',
     );
   }
 
