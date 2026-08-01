@@ -21,11 +21,15 @@ class InMemoryKeyVault implements KeyVault {
 }
 
 class FakeBiometricGate implements BiometricGate {
-  FakeBiometricGate(
-      {this.approve = true, this.available = true, this.delay = Duration.zero});
+  FakeBiometricGate({
+    this.approve = true,
+    this.available = true,
+    this.delay = Duration.zero,
+  });
   final bool approve;
   final bool available;
-  final Duration delay; // Duration.zero default: pending Timers fail widget tests
+  final Duration
+  delay; // Duration.zero default: pending Timers fail widget tests
   int authCalls = 0;
   @override
   Future<bool> get isAvailable async => available;
@@ -44,10 +48,13 @@ class FakeQrScanner implements QrScanner {
   void emit(String payload) => _controller.add(payload);
   @override
   Widget buildPreview() => Container(
-      color: const Color(0xFF222222),
-      alignment: Alignment.center,
-      child: const Text('camera preview (fake)',
-          style: TextStyle(color: Color(0xFFFFFFFF))));
+    color: const Color(0xFF222222),
+    alignment: Alignment.center,
+    child: const Text(
+      'camera preview (fake)',
+      style: TextStyle(color: Color(0xFFFFFFFF)),
+    ),
+  );
 }
 
 class InMemoryLedgerStore implements LedgerStore {
