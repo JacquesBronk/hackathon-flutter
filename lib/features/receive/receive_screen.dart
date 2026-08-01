@@ -36,6 +36,23 @@ class _ReceiveScreenState extends ConsumerState<ReceiveScreen> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
   }
 
+  /// Real-hardware note (C3): HCE has no maintained Flutter plugin yet, so
+  /// this throws on-device — caught here rather than left to crash the
+  /// toggle. Sticker read/write are unaffected.
+  Future<void> _enableTapMode(int? amount) async {
+    try {
+      await ref
+          .read(nfcControllerProvider.notifier)
+          .enableTapMode(amount: amount);
+    } catch (_) {
+      _showSnack("Tap mode isn't available on this phone");
+    }
+  }
+
+  Future<void> _disableTapMode() async {
+    await ref.read(nfcControllerProvider.notifier).disableTapMode();
+  }
+
   void _startScanning() {
     setState(() {
       _scanning = true;
@@ -88,12 +105,12 @@ class _ReceiveScreenState extends ConsumerState<ReceiveScreen> {
     }
     return Scaffold(
       appBar: AppBar(title: const Text('Receive')),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: _scanning
-            ? _buildScanning()
-            : _buildShowQr(keys.address, profile.name),
-      ),
+      body: _scanning
+          ? Padding(padding: const EdgeInsets.all(24), child: _buildScanning())
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: _buildShowQr(keys.address, profile.name),
+            ),
     );
   }
 
@@ -101,7 +118,7 @@ class _ReceiveScreenState extends ConsumerState<ReceiveScreen> {
     final received = _received;
     if (received != null) {
       return Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
         children: [
           const PinnieCoin(flipOnBuild: true),
           const SizedBox(height: 16),
@@ -116,8 +133,10 @@ class _ReceiveScreenState extends ConsumerState<ReceiveScreen> {
     final data = encodeReceiveRequest(
       ReceiveRequest(addr: addr, name: name, amount: amount),
     );
+    final tapModeActive =
+        ref.watch(nfcControllerProvider).valueOrNull?.tapModeActive ?? false;
     return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
       children: [
         QrImageView(data: data, size: 260),
         const SizedBox(height: 16),
@@ -134,6 +153,32 @@ class _ReceiveScreenState extends ConsumerState<ReceiveScreen> {
           onPressed: _startScanning,
           child: const Text("Scan sender's code"),
         ),
+        const SizedBox(height: 24),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text('Tap mode'),
+            Switch(
+              key: const Key('nfc.tapmode.toggle'),
+              value: tapModeActive,
+              onChanged: (active) =>
+                  active ? _enableTapMode(amount) : _disableTapMode(),
+            ),
+          ],
+        ),
+        // NFC-active indicator (README §5).
+        if (tapModeActive)
+          const Padding(
+            padding: EdgeInsets.only(top: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.nfc, color: CmoColors.orange),
+                SizedBox(width: 8),
+                Text('NFC active — tap to pay'),
+              ],
+            ),
+          ),
       ],
     );
   }

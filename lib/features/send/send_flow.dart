@@ -24,6 +24,7 @@ class SendFlow extends ConsumerStatefulWidget {
 class _SendFlowState extends ConsumerState<SendFlow> {
   _Phase _phase = _Phase.scan;
   StreamSubscription<String>? _sub;
+  StreamSubscription<ReceiveRequest>? _nfcSub;
   ReceiveRequest? _rr;
   Transaction? _tx;
   final _amountController = TextEditingController();
@@ -33,11 +34,18 @@ class _SendFlowState extends ConsumerState<SendFlow> {
   void initState() {
     super.initState();
     _sub = ref.read(qrScannerProvider).scans.listen(_onScan);
+    // HCE tap-to-pay (spec §4): the receiver's own cmo:rr1: request reads
+    // the same way a scanned QR does and lands on the same confirm phase.
+    _nfcSub = ref
+        .read(nfcControllerProvider.notifier)
+        .sendRequests
+        .listen(_routeToConfirm);
   }
 
   @override
   void dispose() {
     _sub?.cancel();
+    _nfcSub?.cancel();
     _amountController.dispose();
     _memoController.dispose();
     super.dispose();
@@ -58,17 +66,21 @@ class _SendFlowState extends ConsumerState<SendFlow> {
     }
     switch (payload) {
       case ReceiveRequest rr:
-        ref.read(peerDirectoryProvider).record(rr.addr, rr.name);
-        _amountController.text = rr.amount?.toString() ?? '';
-        setState(() {
-          _rr = rr;
-          _phase = _Phase.confirm;
-        });
+        _routeToConfirm(rr);
       case SignedTransactionPayload _:
         _showSnack("That's a payment code — use Receive");
       case VoucherPayload _:
         _showSnack("That's a voucher — use NFC to claim it");
     }
+  }
+
+  void _routeToConfirm(ReceiveRequest rr) {
+    ref.read(peerDirectoryProvider).record(rr.addr, rr.name);
+    _amountController.text = rr.amount?.toString() ?? '';
+    setState(() {
+      _rr = rr;
+      _phase = _Phase.confirm;
+    });
   }
 
   Future<void> _confirm() async {

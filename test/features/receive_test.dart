@@ -4,6 +4,7 @@ import 'package:cash_me_outside/domain/qr_codec.dart';
 import 'package:cash_me_outside/domain/transaction.dart';
 import 'package:cash_me_outside/features/receive/receive_screen.dart';
 import 'package:cash_me_outside/fakes/fakes.dart';
+import 'package:cash_me_outside/fakes/nfc_fakes.dart';
 import 'package:cash_me_outside/providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -89,4 +90,43 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Counterfeit pinnies rejected'), findsOneWidget);
   });
+
+  testWidgets(
+    'Tap-mode toggle starts/stops an HCE session carrying own rr1; shows '
+    'the NFC-active indicator only while active',
+    (tester) async {
+      final nfcPort = FakeNfcPort();
+      final container = ProviderContainer(
+        overrides: fakeHardwareOverrides(nfcPort: nfcPort),
+      );
+      addTearDown(container.dispose);
+      await container
+          .read(profileControllerProvider.notifier)
+          .createWallet(name: 'Me', avatar: '🦫');
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(home: ReceiveScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('NFC active — tap to pay'), findsNothing);
+      await tester.tap(find.byKey(const Key('nfc.tapmode.toggle')));
+      await tester.pumpAndSettle();
+
+      expect(nfcPort.hceActive, isTrue);
+      expect(nfcPort.hceSessions, hasLength(1));
+      final rr = decodeQr(nfcPort.hceSessions.single) as ReceiveRequest;
+      final myAddr = (await container.read(walletKeysProvider.future))!.address;
+      expect(rr.addr, myAddr);
+      expect(find.text('NFC active — tap to pay'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('nfc.tapmode.toggle')));
+      await tester.pumpAndSettle();
+
+      expect(nfcPort.hceActive, isFalse);
+      expect(find.text('NFC active — tap to pay'), findsNothing);
+    },
+  );
 }
