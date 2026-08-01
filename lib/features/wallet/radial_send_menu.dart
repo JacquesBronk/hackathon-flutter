@@ -6,8 +6,8 @@ const _methods = [
   ('Mesh', Icons.hub, '/send-mesh'),
   ('Contact', Icons.person, null),
   ('Radar', Icons.radar, null),
-  ('Pour', Icons.local_drink, null),
-  ('Rain', Icons.grain, null),
+  ('Pour', Icons.local_drink, '/pour'),
+  ('Rain', Icons.grain, '/rain'),
   ('Voice', Icons.mic, null),
 ];
 

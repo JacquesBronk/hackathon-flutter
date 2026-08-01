@@ -5,7 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'domain/keys.dart';
 import 'features/history/history_screen.dart';
 import 'features/nfc/sticker_studio.dart';
+import 'features/pour/catch_screen.dart';
+import 'features/pour/pour_flow.dart';
 import 'features/radar/radar_screen.dart';
+import 'features/rain/rain_screen.dart';
 import 'features/receive/receive_screen.dart';
 import 'features/root/root_gate.dart';
 import 'features/send/mesh_send_flow.dart';
@@ -44,6 +47,9 @@ class CashMeOutsideApp extends StatelessWidget {
           initialPeerAddr:
               ModalRoute.of(context)?.settings.arguments as String?,
         ),
+        '/pour': (_) => const PourFlow(),
+        '/pour/catch': (_) => const CatchScreen(),
+        '/rain': (_) => const RainScreen(),
         '/radar': (_) => Consumer(
           builder: (context, ref, _) {
             final mesh = ref.watch(meshControllerProvider);
@@ -54,6 +60,7 @@ class CashMeOutsideApp extends StatelessWidget {
             }
             return RadarScreen(
               relayEvents: ref.read(meshControllerProvider.notifier).relays,
+              headings: ref.read(compassProvider).headingRadians,
             );
           },
         ),

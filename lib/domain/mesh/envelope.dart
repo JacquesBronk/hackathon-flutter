@@ -146,3 +146,58 @@ String presencePayload(String addr, String name) =>
   }
   return (addr: addr, name: name);
 }
+
+// Pour envelope payload (kind: pour — spec §2.1 reserved, defined here per
+// the sensors plan's Global Constraints). Cosmetic, unsigned progress for a
+// pour session; the money itself is a separate, ordinary `tx` envelope sent
+// once at pour end. Receivers render from the highest `seq` only, so
+// out-of-order relay delivery is safe.
+const pourStatePouring = 'pouring';
+const pourStateStopped = 'stopped';
+const pourStateFinal = 'final';
+
+String pourPayload({
+  required String sessionId,
+  required int seq,
+  required int pouredTotal,
+  required String state,
+  String? txId,
+}) => jsonEncode({
+  'sessionId': sessionId,
+  'seq': seq,
+  'pouredTotal': pouredTotal,
+  'state': state,
+  'txId': ?txId,
+});
+
+({String sessionId, int seq, int pouredTotal, String state, String? txId})
+parsePourPayload(String payload) {
+  final Object? json;
+  try {
+    json = jsonDecode(payload);
+  } catch (_) {
+    throw const FormatException('malformed pour payload');
+  }
+  if (json is! Map<String, Object?>) {
+    throw const FormatException('malformed pour payload');
+  }
+  final sessionId = json['sessionId'],
+      seq = json['seq'],
+      pouredTotal = json['pouredTotal'],
+      state = json['state'],
+      txId = json['txId'];
+  if (sessionId is! String ||
+      seq is! int ||
+      pouredTotal is! int ||
+      state is! String ||
+      (txId != null && txId is! String)) {
+    throw const FormatException('malformed pour payload');
+  }
+  return (
+    sessionId: sessionId,
+    seq: seq,
+    pouredTotal: pouredTotal,
+    state: state,
+    txId: txId as String?,
+  );
+}

@@ -24,9 +24,22 @@ double _ringFractionFor(int rssi) {
 double _angleFor(String addr) =>
     (addr.hashCode & 0xffff) / 0xffff * 2 * math.pi;
 
-Offset _positionFor(MeshPeer peer, Offset center, double maxRadius) {
+/// Peer blip angle relative to true bearing: the hash-derived angle rotated
+/// by the device's own compass heading, so blips hold a stable geographic
+/// position as the phone turns. `heading` is 0 (no rotation) when no
+/// [CompassPort] readings have arrived yet — the RSSI-ring-only layout is
+/// unchanged in that fallback case.
+double _bearingAngleFor(String addr, double heading) =>
+    _angleFor(addr) - heading;
+
+Offset _positionFor(
+  MeshPeer peer,
+  Offset center,
+  double maxRadius,
+  double heading,
+) {
   final radius = _ringFractionFor(peer.rssi) * maxRadius;
-  final angle = _angleFor(peer.addr);
+  final angle = _bearingAngleFor(peer.addr, heading);
   return center + Offset(math.cos(angle), math.sin(angle)) * radius;
 }
 
@@ -34,12 +47,18 @@ Offset _positionFor(MeshPeer peer, Offset center, double maxRadius) {
 /// by RSSI bucket, a single-run pulse on relay traffic. Tests pump this
 /// widget directly (no route is registered here — see A6).
 class RadarScreen extends ConsumerStatefulWidget {
-  const RadarScreen({super.key, this.relayEvents});
+  const RadarScreen({super.key, this.relayEvents, this.headings});
 
   /// Fires once per envelope this phone relays for someone else. Optional so
   /// the widget is testable/constructible before the real wiring (A6) hooks
   /// it up to `MeshController`.
   final Stream<RelayEvent>? relayEvents;
+
+  /// Compass heading readings (radians), from [CompassPort]. Optional (like
+  /// [relayEvents]) so the widget is constructible/testable without a real
+  /// or fake compass wired up — absent, blips stay in the pre-B5 hash-angle
+  /// layout (B5's real wiring supplies this from `compassProvider`).
+  final Stream<double>? headings;
 
   @override
   ConsumerState<RadarScreen> createState() => _RadarScreenState();
@@ -55,7 +74,9 @@ class _RadarScreenState extends ConsumerState<RadarScreen>
   // i.e. after the widget is unmounted, crashing the vsync ancestor lookup.
   late final AnimationController _pulse;
   StreamSubscription<RelayEvent>? _relaySub;
+  StreamSubscription<double>? _headingSub;
   bool _reducedMotion = false;
+  double _heading = 0;
 
   @override
   void initState() {
@@ -66,6 +87,9 @@ class _RadarScreenState extends ConsumerState<RadarScreen>
     );
     _relaySub = widget.relayEvents?.listen((_) {
       if (!_reducedMotion) _pulse.forward(from: 0);
+    });
+    _headingSub = widget.headings?.listen((h) {
+      if (mounted) setState(() => _heading = h);
     });
   }
 
@@ -78,6 +102,7 @@ class _RadarScreenState extends ConsumerState<RadarScreen>
   @override
   void dispose() {
     unawaited(_relaySub?.cancel());
+    unawaited(_headingSub?.cancel());
     _pulse.dispose();
     super.dispose();
   }
@@ -119,7 +144,7 @@ class _RadarScreenState extends ConsumerState<RadarScreen>
               for (final peer in peers)
                 _Blip(
                   peer: peer,
-                  position: _positionFor(peer, center, maxRadius),
+                  position: _positionFor(peer, center, maxRadius, _heading),
                   onTap: () => Navigator.pushNamed(
                     context,
                     '/send-mesh',

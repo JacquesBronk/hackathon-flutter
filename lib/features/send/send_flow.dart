@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../domain/canonical.dart';
 import '../../domain/keys.dart';
@@ -11,8 +12,11 @@ import '../../domain/transaction.dart';
 import '../../providers.dart';
 import '../../theme/coin.dart';
 import '../../theme/tokens.dart';
+import 'grace_window_widget.dart';
 
-enum _Phase { scan, confirm, code }
+const _uuid = Uuid();
+
+enum _Phase { scan, confirm, grace, code }
 
 class SendFlow extends ConsumerStatefulWidget {
   const SendFlow({super.key});
@@ -27,6 +31,8 @@ class _SendFlowState extends ConsumerState<SendFlow> {
   StreamSubscription<ReceiveRequest>? _nfcSub;
   ReceiveRequest? _rr;
   Transaction? _tx;
+  String? _pendingId;
+  int? _pendingAmount;
   final _amountController = TextEditingController();
   final _memoController = TextEditingController();
 
@@ -84,7 +90,6 @@ class _SendFlowState extends ConsumerState<SendFlow> {
   }
 
   Future<void> _confirm() async {
-    final rr = _rr!;
     final amount = int.tryParse(_amountController.text);
     if (amount == null || amount < 1 || amount > maxAmount) {
       _showSnack("That's not a real amount of pinnies");
@@ -97,17 +102,43 @@ class _SendFlowState extends ConsumerState<SendFlow> {
       _showSnack('Biometric check failed');
       return;
     }
+    setState(() {
+      _pendingId = _uuid.v7();
+      _pendingAmount = amount;
+      _phase = _Phase.grace;
+    });
+  }
+
+  /// Fires once the post-biometric [GraceWindowWidget] decides: `true` =
+  /// window elapsed undisturbed, so this is the ONE place a QR-flow send
+  /// actually signs+ingests a tx (spec Global Constraints — shake-cancel
+  /// must abort before `send()`, never after). `false` = aborted; the
+  /// ledger stays untouched and the flow returns to confirm.
+  Future<void> _afterGrace(bool decided) async {
+    if (!decided) {
+      setState(() {
+        _phase = _Phase.confirm;
+        _pendingId = null;
+        _pendingAmount = null;
+      });
+      _showSnack('Cancelled — nothing sent');
+      return;
+    }
+    final rr = _rr!;
+    final amount = _pendingAmount!;
     try {
       final memo = _memoController.text.trim();
       final tx = await ref
           .read(ledgerControllerProvider.notifier)
           .send(to: rr.addr, amount: amount, memo: memo.isEmpty ? null : memo);
+      if (!mounted) return;
       setState(() {
         _tx = tx;
         _phase = _Phase.code;
       });
     } catch (_) {
       _showSnack("Couldn't save — try again");
+      setState(() => _phase = _Phase.confirm);
     }
   }
 
@@ -167,6 +198,16 @@ class _SendFlowState extends ConsumerState<SendFlow> {
                   child: const Text('Confirm'),
                 ),
               ],
+            ),
+          ),
+        );
+      case _Phase.grace:
+        return Scaffold(
+          appBar: AppBar(title: const Text('Sending')),
+          body: Center(
+            child: GraceWindowWidget(
+              pendingId: _pendingId!,
+              onDecided: (decided) => unawaited(_afterGrace(decided)),
             ),
           ),
         );
