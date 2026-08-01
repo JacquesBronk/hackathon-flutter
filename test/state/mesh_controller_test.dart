@@ -225,6 +225,21 @@ void main() {
     },
   );
 
+  test('broadcastPresenceOnce emits a valid presence frame', () async {
+    final node = await _createNode(containers, 'Presence');
+    await node.mesh.broadcastPresenceOnce();
+    await pumpEventQueue();
+
+    expect(node.transport.sentFrames, hasLength(1));
+    final envelope = decodeFrame(node.transport.sentFrames.single);
+    expect(envelope.kind, envKindPresence);
+    expect(envelope.target, isNull);
+    expect(envelope.origin, node.addr);
+    final payload = parsePresencePayload(envelope.payload);
+    expect(payload.addr, node.addr);
+    expect(payload.name, 'Presence');
+  });
+
   test('peer-lost: link down empties livePeers; targeted send after disconnect '
       'parks in outbox; relink flushes and delivers', () async {
     final hub = LoopbackHub();
