@@ -38,10 +38,15 @@ class _StickerStudioState extends ConsumerState<StickerStudio> {
 
   Future<void> _writeRequestTag() async {
     final amount = int.tryParse(_requestAmountController.text);
-    await ref
-        .read(nfcControllerProvider.notifier)
-        .writeRequestTag(amount: amount);
-    _showSnack('Request sticker written — tap a tag to save it');
+    _showSnack('Hold a tag to the back of your phone…');
+    try {
+      await ref
+          .read(nfcControllerProvider.notifier)
+          .writeRequestTag(amount: amount);
+      _showSnack('Request sticker written');
+    } catch (_) {
+      _showSnack("Couldn't write the tag — try again");
+    }
   }
 
   Future<void> _writeVoucherTag() async {
@@ -50,15 +55,19 @@ class _StickerStudioState extends ConsumerState<StickerStudio> {
       _showSnack("That's not a real amount of pinnies");
       return;
     }
-    final wrote = await ref
-        .read(nfcControllerProvider.notifier)
-        .writeVoucherTag(amount);
-    if (!mounted) return;
-    _showSnack(
-      wrote
-          ? 'Voucher sticker written — first to sync wins'
-          : 'Biometric check failed',
-    );
+    try {
+      final wrote = await ref
+          .read(nfcControllerProvider.notifier)
+          .writeVoucherTag(amount);
+      if (!mounted) return;
+      _showSnack(
+        wrote
+            ? 'Voucher sticker written — first to sync wins'
+            : 'Biometric check failed',
+      );
+    } catch (_) {
+      _showSnack("Couldn't write the tag — try again");
+    }
   }
 
   /// A read of ANY kind can arrive here — only voucher claims move

@@ -96,17 +96,32 @@ class NfcAdapter implements NfcPort {
     final wasReading = _readLoopWanted;
     _readLoopWanted = false;
     await NfcManager.instance.stopSession().catchError((_) {});
+    final written = Completer<void>();
     await NfcManager.instance.startSession(
       pollingOptions: const {NfcPollingOption.iso14443},
       onDiscovered: (tag) async {
-        final ndef = Ndef.from(tag);
-        if (ndef != null) {
+        try {
+          final ndef = Ndef.from(tag);
+          if (ndef == null) {
+            throw StateError('tag is not NDEF-writable');
+          }
           await ndef.write(message: NdefMessage(records: [_uriRecord(uri)]));
+          await NfcManager.instance.stopSession();
+          written.complete();
+        } catch (e) {
+          await NfcManager.instance.stopSession().catchError((_) {});
+          if (!written.isCompleted) written.completeError(e);
         }
-        await NfcManager.instance.stopSession();
       },
     );
-    if (wasReading) _resumeReadLoop();
+    // startSession returns once the session OPENS, not when a tag arrives
+    // via onDiscovered — awaiting `written` here is what makes writeTag
+    // actually wait for the tap instead of racing the read loop's resume.
+    try {
+      await written.future;
+    } finally {
+      if (wasReading) _resumeReadLoop();
+    }
   }
 
   @override
