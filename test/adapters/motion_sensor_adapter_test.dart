@@ -9,10 +9,7 @@ void main() {
     });
 
     test('held vertical (gravity on y) is pi/2 tilt', () {
-      expect(
-        tiltRadiansFromAccel(0, 9.80665, 0),
-        closeTo(math.pi / 2, 1e-9),
-      );
+      expect(tiltRadiansFromAccel(0, 9.80665, 0), closeTo(math.pi / 2, 1e-9));
     });
 
     test('upside down flat (gravity opposes z) is pi tilt', () {
