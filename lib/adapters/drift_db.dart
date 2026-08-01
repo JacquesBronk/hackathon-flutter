@@ -36,7 +36,15 @@ class AppDatabase extends _$AppDatabase {
   int get schemaVersion => 1;
 }
 
-AppDatabase openAppDatabase() => AppDatabase(driftDatabase(name: 'cmo'));
+AppDatabase openAppDatabase() => AppDatabase(
+  driftDatabase(
+    name: 'cmo',
+    web: DriftWebOptions(
+      sqlite3Wasm: Uri.parse('sqlite3.wasm'),
+      driftWorker: Uri.parse('drift_worker.js'),
+    ),
+  ),
+);
 
 class DriftLedgerStore implements LedgerStore {
   DriftLedgerStore(this._db);

@@ -5,8 +5,13 @@ class LocalAuthGate implements BiometricGate {
   final _auth = LocalAuthentication();
 
   @override
-  Future<bool> get isAvailable async =>
-      await _auth.isDeviceSupported() || await _auth.canCheckBiometrics;
+  Future<bool> get isAvailable async {
+    try {
+      return await _auth.isDeviceSupported() || await _auth.canCheckBiometrics;
+    } catch (_) {
+      return false;
+    }
+  }
 
   @override
   Future<bool> authenticate(String reason) async {
