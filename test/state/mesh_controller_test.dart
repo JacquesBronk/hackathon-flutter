@@ -118,6 +118,33 @@ void main() {
     expect(node.notifier.shown, isNotEmpty);
   });
 
+  test(
+    'targeted tx-kind envelope with garbage payload → no crash, no ledger change',
+    () async {
+      final node = await _createNode(containers, 'Garbage');
+      final envelope = MeshEnvelope(
+        msgId: _uuid.v7(),
+        kind: envKindTx,
+        origin: 'origin-addr',
+        target: node.addr,
+        ttl: meshInitialTtl,
+        path: const [],
+        payload: 'not a valid cmo:tx1: payload',
+      );
+      node.transport.injectFrame(encodeFrame(envelope));
+      await pumpEventQueue();
+
+      final state = await node.container.read(ledgerControllerProvider.future);
+      expect(state.ordered, hasLength(1)); // only the mint, tx never ingested
+      expect(
+        node.transport.sentFrames
+            .map(decodeFrame)
+            .where((e) => e.kind == envKindReceipt),
+        isEmpty,
+      );
+    },
+  );
+
   test('presence envelope records the peer name', () async {
     final node = await _createNode(containers, 'Beto');
     final envelope = MeshEnvelope(

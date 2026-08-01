@@ -73,50 +73,64 @@ class MeshController extends AsyncNotifier<MeshState> {
     return const MeshState(livePeers: [], deliveries: {});
   }
 
+  /// Payload parsing (decodeQr / parsePresencePayload / parseReceiptPayload)
+  /// is untrusted input off the wire — a malformed payload must drop
+  /// silently, never crash this listener.
   Future<void> _handleDelivered(MeshEnvelope envelope) async {
-    switch (envelope.kind) {
-      case envKindTx:
-        final payload = decodeQr(envelope.payload);
-        if (payload is! SignedTransactionPayload) return;
-        final tx = payload.transaction;
-        await ref.read(ledgerControllerProvider.notifier).ingestExternal(tx);
-        _engine.originate(
-          MeshEnvelope(
-            msgId: _uuid.v7(),
-            kind: envKindReceipt,
-            origin: _selfAddr,
-            target: envelope.origin,
-            ttl: meshInitialTtl,
-            path: const [],
-            payload: receiptPayload(envelope.msgId, envelope.path.length),
-          ),
-        );
-        await _notifier.show(
-          id: _notifId(envelope.msgId),
-          title: 'Pinnies received',
-          body: 'ᵽ${tx.amount} arrived via the mesh',
-        );
-      case envKindPresence:
-        final p = parsePresencePayload(envelope.payload);
-        await ref.read(peerDirectoryProvider).record(p.addr, p.name);
-      case envKindReceipt:
-        final (forMsgId, hops) = parseReceiptPayload(envelope.payload);
-        final txId = _txEnvelopeToTxId[forMsgId];
-        if (txId == null) return;
-        _setDelivery(txId, MeshDeliveryStatus.delivered);
-        await _notifier.show(
-          id: _notifId(forMsgId),
-          title: 'Delivered',
-          body: 'arrived via $hops phones',
-        );
-      default:
-        break; // chat/pour reserved, no handling yet
+    try {
+      switch (envelope.kind) {
+        case envKindTx:
+          final payload = decodeQr(envelope.payload);
+          if (payload is! SignedTransactionPayload) return;
+          final tx = payload.transaction;
+          await ref
+              .read(ledgerControllerProvider.notifier)
+              .ingestExternal(tx);
+          _engine.originate(
+            MeshEnvelope(
+              msgId: _uuid.v7(),
+              kind: envKindReceipt,
+              origin: _selfAddr,
+              target: envelope.origin,
+              ttl: meshInitialTtl,
+              path: const [],
+              payload: receiptPayload(envelope.msgId, envelope.path.length),
+            ),
+          );
+          await _notifier.show(
+            id: _notifId(envelope.msgId),
+            title: 'Pinnies received',
+            body: 'ᵽ${tx.amount} arrived via the mesh',
+          );
+        case envKindPresence:
+          final p = parsePresencePayload(envelope.payload);
+          await ref.read(peerDirectoryProvider).record(p.addr, p.name);
+        case envKindReceipt:
+          final (forMsgId, hops) = parseReceiptPayload(envelope.payload);
+          final txId = _txEnvelopeToTxId[forMsgId];
+          if (txId == null) return;
+          _setDelivery(txId, MeshDeliveryStatus.delivered);
+          await _notifier.show(
+            id: _notifId(forMsgId),
+            title: 'Delivered',
+            body: 'arrived via $hops phones',
+          );
+        default:
+          break; // chat/pour reserved, no handling yet
+      }
+    } catch (_) {
+      // malformed payload — silent drop.
     }
   }
 
   void _handleRelay(RelayEvent event) {
     if (event.envelope.kind != envKindTx) return; // silent for presence etc.
-    final payload = decodeQr(event.envelope.payload);
+    final Object? payload;
+    try {
+      payload = decodeQr(event.envelope.payload);
+    } catch (_) {
+      return; // malformed payload — silent drop.
+    }
     if (payload is! SignedTransactionPayload) return;
     unawaited(
       _notifier.show(
