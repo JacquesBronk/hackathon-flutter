@@ -35,6 +35,12 @@ class MeshController extends AsyncNotifier<MeshState> {
   /// pulse animation is fed from this.
   Stream<RelayEvent> get relays => _engine.relays;
 
+  /// Incoming `pour`-kind envelopes (cosmetic pour progress/final frames —
+  /// B1's sensors work). Never touches the ledger; consumed by
+  /// [PourController]'s catch-side fold.
+  Stream<MeshEnvelope> get pourFrames => _pourFrameController.stream;
+  final _pourFrameController = StreamController<MeshEnvelope>.broadcast();
+
   final _peersByAddr = <String, MeshPeer>{};
   // envelope msgId of an originated `tx` -> that transaction's id, so a
   // later receipt (keyed by the envelope msgId) can update `deliveries`
@@ -69,6 +75,7 @@ class MeshController extends AsyncNotifier<MeshState> {
       for (final s in subs) {
         unawaited(s.cancel());
       }
+      unawaited(_pourFrameController.close());
     });
 
     return const MeshState(livePeers: [], deliveries: {});
@@ -114,8 +121,10 @@ class MeshController extends AsyncNotifier<MeshState> {
             title: 'Delivered',
             body: 'arrived via $hops phones',
           );
+        case envKindPour:
+          _pourFrameController.add(envelope);
         default:
-          break; // chat/pour reserved, no handling yet
+          break; // chat reserved, no handling yet
       }
     } catch (_) {
       // malformed payload — silent drop.
@@ -203,6 +212,14 @@ class MeshController extends AsyncNotifier<MeshState> {
     _engine.originate(envelope);
     _setDelivery(tx.id, MeshDeliveryStatus.hopping);
     return tx.id;
+  }
+
+  /// Originates a raw `pour`-kind envelope — cosmetic progress/final frames
+  /// from [PourController]. Unsigned and never touches the ledger; a pour
+  /// session's money movement is exactly one ordinary tx via [sendMeshTx].
+  Future<void> sendPourFrame(MeshEnvelope envelope) async {
+    await future;
+    _engine.originate(envelope);
   }
 
   Future<void> broadcastPresenceOnce() async {
