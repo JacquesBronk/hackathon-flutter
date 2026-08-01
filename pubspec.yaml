@@ -48,6 +48,8 @@ dependencies:
   flutter_blue_plus: ^2.3.11
   bluetooth_low_energy: ^6.2.1
   flutter_local_notifications: ^22.2.0
+  nfc_manager: ^4.2.1
+  nfc_manager_ndef: ^1.1.0
 
 dev_dependencies:
   flutter_test:
