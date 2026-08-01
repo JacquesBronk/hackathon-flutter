@@ -61,15 +61,8 @@ class GossipEngine {
     _seen.add(envelope.msgId);
     _seenAdditions.add(envelope.msgId);
 
-    final isForSelf = envelope.target == null || envelope.target == selfAddr;
-    if (isForSelf && _knownKinds.contains(envelope.kind)) {
-      _delivered.add(envelope);
-      if (envelope.kind == envKindReceipt) {
-        final (forMsgId, _) = parseReceiptPayload(envelope.payload);
-        _outboxClears.add(forMsgId);
-      }
-    }
-
+    // Relay is decided from envelope fields ONLY — payload is opaque to
+    // relays, so a garbage payload must still relay (spec §2.2 rule 4).
     if (envelope.ttl > 1 && envelope.target != selfAddr) {
       final relayed = envelope.relayedBy(selfAddr);
       _relays.add(RelayEvent(envelope: envelope));
@@ -81,6 +74,27 @@ class GossipEngine {
           _now().add(const Duration(hours: 24)),
         ));
       }
+    }
+
+    final isForSelf = envelope.target == null || envelope.target == selfAddr;
+    if (isForSelf && _knownKinds.contains(envelope.kind)) {
+      try {
+        _deliverLocally(envelope);
+      } catch (_) {
+        // malformed payload — silent drop, never throw out of onFrame.
+      }
+    }
+  }
+
+  void _deliverLocally(MeshEnvelope envelope) {
+    if (envelope.kind == envKindReceipt) {
+      // Parse before publishing delivery so a malformed receipt payload
+      // drops silently instead of surfacing a delivery no one can read.
+      final (forMsgId, _) = parseReceiptPayload(envelope.payload);
+      _delivered.add(envelope);
+      _outboxClears.add(forMsgId);
+    } else {
+      _delivered.add(envelope);
     }
   }
 

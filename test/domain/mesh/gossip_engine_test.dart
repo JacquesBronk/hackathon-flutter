@@ -235,6 +235,54 @@ void main() {
     expect(outbound, [frame]);
   });
 
+  test(
+    'broadcast receipt-kind frame with garbage payload → no throw, '
+    'relayed exactly once, nothing delivered',
+    () {
+      final e = engine();
+      final delivered = <MeshEnvelope>[];
+      final relays = <RelayEvent>[];
+      final outbound = <String>[];
+      final clears = <String>[];
+      e.delivered.listen(delivered.add);
+      e.relays.listen(relays.add);
+      e.outboundFrames.listen(outbound.add);
+      e.outboxClears.listen(clears.add);
+
+      final frame = encodeFrame(
+        env(kind: envKindReceipt, target: null, ttl: 8, payload: 'not json'),
+      );
+
+      expect(() => e.onFrame(frame), returnsNormally);
+
+      expect(delivered, isEmpty);
+      expect(clears, isEmpty);
+      expect(relays.length, 1);
+      expect(outbound.length, 1);
+    },
+  );
+
+  test(
+    'targeted-at-self tx-kind frame with garbage payload → no throw, '
+    'still delivered (payload validation is the caller\'s job)',
+    () {
+      final e = engine();
+      final delivered = <MeshEnvelope>[];
+      final relays = <RelayEvent>[];
+      e.delivered.listen(delivered.add);
+      e.relays.listen(relays.add);
+
+      final frame = encodeFrame(
+        env(kind: envKindTx, target: self, ttl: 8, payload: 'not a tx'),
+      );
+
+      expect(() => e.onFrame(frame), returnsNormally);
+
+      expect(delivered.length, 1);
+      expect(relays, isEmpty); // targeted at self — never relayed
+    },
+  );
+
   test('malformed frame via onFrame → nothing emitted, no throw', () {
     final e = engine();
     final delivered = <MeshEnvelope>[];
