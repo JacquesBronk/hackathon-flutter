@@ -51,9 +51,7 @@ class DriftSeenStore implements SeenStore {
       _db.seenRows,
     )..where((t) => t.msgId.equals(msgId))).getSingleOrNull();
     if (exists != null) return;
-    await _db
-        .into(_db.seenRows)
-        .insert(SeenRowsCompanion.insert(msgId: msgId));
+    await _db.into(_db.seenRows).insert(SeenRowsCompanion.insert(msgId: msgId));
     final overflow = await _db.seenRows.count().getSingle() - _cap;
     if (overflow <= 0) return;
     final oldest =

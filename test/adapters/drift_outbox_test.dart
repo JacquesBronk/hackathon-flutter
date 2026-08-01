@@ -31,19 +31,26 @@ void main() {
     expect(pending.single, ('m1', '{"v":2}'));
   });
 
-  test('DriftOutboxStore.pending excludes and clears expired entries', () async {
-    final db = AppDatabase(NativeDatabase.memory());
-    addTearDown(db.close);
-    final store = DriftOutboxStore(db);
-    final past = DateTime.now().subtract(const Duration(hours: 1));
-    await store.put('expired', '{}', past);
-    expect(await store.pending(), isEmpty);
-    // re-putting under the same msgId confirms the expired row was actually
-    // deleted (not merely filtered) — an upsert would otherwise be a no-op
-    // update on a still-present row.
-    await store.put('expired', '{}', DateTime.now().add(const Duration(hours: 1)));
-    expect(await store.pending(), hasLength(1));
-  });
+  test(
+    'DriftOutboxStore.pending excludes and clears expired entries',
+    () async {
+      final db = AppDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      final store = DriftOutboxStore(db);
+      final past = DateTime.now().subtract(const Duration(hours: 1));
+      await store.put('expired', '{}', past);
+      expect(await store.pending(), isEmpty);
+      // re-putting under the same msgId confirms the expired row was actually
+      // deleted (not merely filtered) — an upsert would otherwise be a no-op
+      // update on a still-present row.
+      await store.put(
+        'expired',
+        '{}',
+        DateTime.now().add(const Duration(hours: 1)),
+      );
+      expect(await store.pending(), hasLength(1));
+    },
+  );
 
   test('DriftSeenStore load/add round trip, idempotent add', () async {
     final db = AppDatabase(NativeDatabase.memory());
@@ -72,13 +79,16 @@ void main() {
     expect(seen.contains('overflow'), isTrue);
   });
 
-  test('AppDatabase lands directly on schemaVersion 2 for fresh installs', () async {
-    final db = AppDatabase(NativeDatabase.memory());
-    addTearDown(db.close);
-    expect(db.schemaVersion, 2);
-    // onCreate path (m.createAll()) already exercised by the round-trip
-    // tests above, which fail immediately if outboxRows/seenRows are absent.
-  });
+  test(
+    'AppDatabase lands directly on schemaVersion 2 for fresh installs',
+    () async {
+      final db = AppDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      expect(db.schemaVersion, 2);
+      // onCreate path (m.createAll()) already exercised by the round-trip
+      // tests above, which fail immediately if outboxRows/seenRows are absent.
+    },
+  );
 
   test(
     'migrating from schemaVersion 1 preserves existing data and adds outbox/seen tables',
