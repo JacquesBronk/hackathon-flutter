@@ -31,10 +31,7 @@ class CatchScreen extends ConsumerWidget {
         padding: const EdgeInsets.all(24),
         child: Center(
           child: catchState == null
-              ? const Text(
-                  'Waiting for a pour…',
-                  textAlign: TextAlign.center,
-                )
+              ? const Text('Waiting for a pour…', textAlign: TextAlign.center)
               : _Cup(state: catchState),
         ),
       ),

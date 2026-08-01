@@ -32,7 +32,10 @@ class _Rig {
 // plain tester.pump() calls, so widgets built from a setUp()-built container
 // can hang waiting on controller state that never settles. Matches
 // mesh_send_test.dart's _createNode / receive_test.dart's inline pattern.
-Future<_Rig> _buildRig(WidgetTester tester, {bool approveBiometrics = true}) async {
+Future<_Rig> _buildRig(
+  WidgetTester tester, {
+  bool approveBiometrics = true,
+}) async {
   final motion = FakeMotionSensor();
   final haptics = FakeHaptics();
   final transport = FakeMeshTransport();
@@ -61,7 +64,11 @@ Future<_Rig> _buildRig(WidgetTester tester, {bool approveBiometrics = true}) asy
   );
 }
 
-Future<void> _pump(WidgetTester tester, ProviderContainer container, Widget child) async {
+Future<void> _pump(
+  WidgetTester tester,
+  ProviderContainer container,
+  Widget child,
+) async {
   await tester.pumpWidget(
     UncontrolledProviderScope(
       container: container,

@@ -10,7 +10,11 @@ import 'package:uuid/uuid.dart';
 const _uuid = Uuid();
 
 class _Rig {
-  _Rig({required this.container, required this.transport, required this.myAddr});
+  _Rig({
+    required this.container,
+    required this.transport,
+    required this.myAddr,
+  });
   final ProviderContainer container;
   final FakeMeshTransport transport;
   final String myAddr;
