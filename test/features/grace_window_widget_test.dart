@@ -23,7 +23,9 @@ void main() {
       ),
       child: MediaQuery(
         data: MediaQueryData(disableAnimations: reducedMotion),
-        child: MaterialApp(home: Scaffold(body: Center(child: child))),
+        child: MaterialApp(
+          home: Scaffold(body: Center(child: child)),
+        ),
       ),
     ),
   );

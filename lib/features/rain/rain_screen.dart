@@ -93,7 +93,9 @@ class _RainScreenState extends ConsumerState<RainScreen>
         return;
       }
       final txById = {
-        for (final tx in ref.read(ledgerControllerProvider).valueOrNull?.ordered ?? const [])
+        for (final tx
+            in ref.read(ledgerControllerProvider).valueOrNull?.ordered ??
+                const [])
           tx.id: tx,
       };
       final amounts = <String, int>{};

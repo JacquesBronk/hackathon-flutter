@@ -55,7 +55,8 @@ class _GraceWindowWidgetState extends ConsumerState<GraceWindowWidget>
   void initState() {
     super.initState();
     _ring = AnimationController(vsync: this, duration: widget.window);
-    final external = widget.abortSignal ?? ref.read(motionSensorProvider).shakes;
+    final external =
+        widget.abortSignal ?? ref.read(motionSensorProvider).shakes;
     _externalAbortSub = external.listen((_) => _combinedAbort.add(null));
     unawaited(_run());
   }

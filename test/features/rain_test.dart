@@ -130,10 +130,7 @@ void main() {
     final ledgerState = await node.container.read(
       ledgerControllerProvider.future,
     );
-    expect(
-      ledgerState.ordered.where((t) => t.type == 'transfer').length,
-      2,
-    );
+    expect(ledgerState.ordered.where((t) => t.type == 'transfer').length, 2);
   });
 
   testWidgets('amount below peer count: friendly error, no send', (
@@ -189,7 +186,12 @@ void main() {
     node.transport.injectPeer(
       MeshPeer(addr: 'peerA', name: null, rssi: -50, lastSeen: DateTime.now()),
     );
-    await _pump(tester, node.container, const RainScreen(), reducedMotion: true);
+    await _pump(
+      tester,
+      node.container,
+      const RainScreen(),
+      reducedMotion: true,
+    );
 
     await tester.enterText(find.byKey(const Key('rain.amount')), '8');
     await tester.tap(find.byKey(const Key('rain.trigger')));
@@ -198,9 +200,6 @@ void main() {
     final ledgerState = await node.container.read(
       ledgerControllerProvider.future,
     );
-    expect(
-      ledgerState.ordered.where((t) => t.type == 'transfer').length,
-      1,
-    );
+    expect(ledgerState.ordered.where((t) => t.type == 'transfer').length, 1);
   });
 }
