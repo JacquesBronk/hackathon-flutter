@@ -25,10 +25,10 @@ String _wrap(String kind, Map<String, Object?> json) =>
     'cmo:$kind:${b64u(utf8.encode(jsonEncode(json)))}';
 
 String encodeReceiveRequest(ReceiveRequest rr) => _wrap('rr1', {
-      'addr': rr.addr,
-      'name': rr.name,
-      if (rr.amount != null) 'amount': rr.amount,
-    });
+  'addr': rr.addr,
+  'name': rr.name,
+  if (rr.amount != null) 'amount': rr.amount,
+});
 
 String encodeTransaction(Transaction tx) => _wrap('tx1', tx.toJson());
 
@@ -39,15 +39,16 @@ QrPayload decodeQr(String raw) {
   }
   final Map<String, Object?> json;
   try {
-    json = jsonDecode(utf8.decode(b64uDecode(parts[2])))
-        as Map<String, Object?>;
+    json =
+        jsonDecode(utf8.decode(b64uDecode(parts[2]))) as Map<String, Object?>;
   } catch (_) {
     throw QrDecodeException('not a pinnie code');
   }
   switch (parts[1]) {
     case 'rr1':
       final addr = json['addr'], name = json['name'], amount = json['amount'];
-      if (addr is! String || name is! String ||
+      if (addr is! String ||
+          name is! String ||
           (amount != null && amount is! int)) {
         throw QrDecodeException('not a pinnie code');
       }
