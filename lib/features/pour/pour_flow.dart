@@ -30,7 +30,8 @@ class PourFlow extends ConsumerWidget {
       ),
       body: meshAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (_, _) => const Center(child: Text("Couldn't load nearby phones")),
+        error: (_, _) =>
+            const Center(child: Text("Couldn't load nearby phones")),
         data: (mesh) {
           final peers = mesh.livePeers;
           if (peers.isEmpty) {

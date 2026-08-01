@@ -237,10 +237,7 @@ void main() {
         ledgerControllerProvider.future,
       );
       expect(receiverLedger.balances[receiver.addr], 525); // 500 mint + 25
-      expect(
-        receiverLedger.ordered.where((t) => t.amount == 25),
-        hasLength(1),
-      );
+      expect(receiverLedger.ordered.where((t) => t.amount == 25), hasLength(1));
     },
   );
 
